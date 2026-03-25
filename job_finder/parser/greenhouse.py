@@ -7,6 +7,8 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 
+from job_finder.salary_extractor import extract_greenhouse_salary
+
 logger = logging.getLogger(__name__)
 
 _GH_RE = re.compile(r'(?:boards|job-boards)\.greenhouse\.io/([^/]+)/jobs/(\d+)')
@@ -29,7 +31,7 @@ def parse(raw: dict) -> dict | None:
         return None
 
     company_slug, job_id = match.group(1), match.group(2)
-    api_url = f"https://boards-api.greenhouse.io/v1/boards/{company_slug}/jobs/{job_id}?content=true"
+    api_url = f"https://boards-api.greenhouse.io/v1/boards/{company_slug}/jobs/{job_id}?content=true&pay_transparency=true"
 
     try:
         resp = requests.get(api_url, timeout=15)
@@ -55,6 +57,8 @@ def parse(raw: dict) -> dict | None:
 
     company = data.get("company_name") or company_slug
 
+    salary = extract_greenhouse_salary(data.get("pay_input_ranges") or [])
+
     return {
         **raw,
         "title":            data.get("title", raw.get("title", "")),
@@ -72,4 +76,17 @@ def parse(raw: dict) -> dict | None:
         "website_url":      None,
         "sf_job_app_id":    None,
         "sf_account_id":    None,
+        # Recruiter — public Greenhouse API does not expose hiring_team
+        "recruiter_name":           None,
+        "recruiter_email":          None,
+        "recruiter_is_internal":    None,
+        "recruiter_firm_name":      None,
+        "recruiter_firm_mission":   None,
+        "recruiter_firm_values":    [],
+        "recruiter_firm_website":   None,
+        "recruiter_firm_hq":        None,
+        "sf_recruiter_account_id":  None,
+        "sf_recruiter_contact_id":  None,
+        # Salary
+        **salary,
     }

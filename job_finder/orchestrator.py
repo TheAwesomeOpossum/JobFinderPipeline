@@ -9,6 +9,7 @@ from job_finder.deduplicator import is_duplicate, hash_url
 from job_finder.scoring import score
 from job_finder.search import google_cse
 from job_finder.parser import greenhouse, lever, generic
+from job_finder.salary_extractor import annual_midpoint
 
 logger = logging.getLogger(__name__)
 
@@ -22,20 +23,49 @@ def _get_parser(url: str):
     return generic
 
 
+def _above_salary_threshold(job: dict) -> bool:
+    """
+    Return True if the job passes the MIN_ANNUAL_SALARY threshold.
+
+    Filter logic: keep if max known salary >= threshold.
+    If no salary data is known, always keep (don't penalise missing data).
+    """
+    threshold = config.MIN_ANNUAL_SALARY
+    if threshold <= 0:
+        return True
+
+    # Collect all known salary ceiling values
+    ceilings: list[float] = []
+    if job.get("annual_salary_max") is not None:
+        ceilings.append(job["annual_salary_max"])
+    elif job.get("annual_salary_min") is not None:
+        ceilings.append(job["annual_salary_min"])
+    if job.get("hourly_rate_max") is not None:
+        ceilings.append(job["hourly_rate_max"] * 2080)
+    elif job.get("hourly_rate_min") is not None:
+        ceilings.append(job["hourly_rate_min"] * 2080)
+
+    if not ceilings:
+        return True  # unknown salary — pass through
+
+    return max(ceilings) >= threshold
+
+
 def run(keywords: str, limit: int, dry_run: bool) -> dict:
     """
     Execute the full job discovery pipeline.
 
-    Returns a summary dict: {found, new, parsed, qualified, pushed, skipped, failed}
+    Returns a summary dict: {found, new, parsed, qualified, pushed, skipped, failed, salary_filtered}
     """
     summary = {
-        "found":     0,
-        "new":       0,
-        "parsed":    0,
-        "qualified": 0,
-        "pushed":    0,
-        "skipped":   0,
-        "failed":    0,
+        "found":            0,
+        "new":              0,
+        "parsed":           0,
+        "salary_filtered":  0,
+        "qualified":        0,
+        "pushed":           0,
+        "skipped":          0,
+        "failed":           0,
     }
 
     pg_conn = db.connect()
@@ -78,6 +108,18 @@ def run(keywords: str, limit: int, dry_run: bool) -> dict:
             score(job)
         parsed_jobs.sort(key=lambda j: j.get("score", 0), reverse=True)
 
+        # Stage 4.5: Hard salary threshold filter (never reaches job_lead)
+        if config.MIN_ANNUAL_SALARY > 0:
+            before = len(parsed_jobs)
+            parsed_jobs = [j for j in parsed_jobs if _above_salary_threshold(j)]
+            summary["salary_filtered"] = before - len(parsed_jobs)
+            if summary["salary_filtered"]:
+                logger.info(
+                    "%d jobs dropped by salary threshold ($%.0f)",
+                    summary["salary_filtered"],
+                    config.MIN_ANNUAL_SALARY,
+                )
+
         # Stage 5: Split qualified vs. skipped
         qualified = parsed_jobs[:limit]
         skipped = parsed_jobs[limit:]
@@ -96,14 +138,25 @@ def run(keywords: str, limit: int, dry_run: bool) -> dict:
             logger.info("Dry run complete. Would push %d jobs to Salesforce.", len(qualified))
             return summary
 
-        # Stage 7: Enrich (one Claude call per unique company)
+        # Stage 7: Enrich companies (one Claude call per unique company)
         qualified = enrichment.enrich_jobs(qualified)
+
+        # Stage 7.5: Enrich recruiter context (for Lever jobs with hiring_managers)
+        qualified = enrichment.enrich_recruiter_jobs(qualified)
 
         # Stage 8: Write to Salesforce
         for job in qualified:
             try:
-                sf_job_app_id, sf_account_id = sf_writer.write_job(sf, job)
-                db.mark_pushed(pg_conn, job["url_hash"], sf_job_app_id, sf_account_id)
+                sf_job_app_id, sf_account_id, sf_recruiter_contact_id = sf_writer.write_job(sf, job)
+                db.mark_pushed(
+                    pg_conn,
+                    job["url_hash"],
+                    sf_job_app_id,
+                    sf_account_id,
+                    sf_recruiter_contact_id=sf_recruiter_contact_id,
+                    annual_salary=annual_midpoint(job),
+                    salary_range_text=(job.get("salary_range_text") or "")[:20] or None,
+                )
                 summary["pushed"] += 1
                 logger.info("Pushed: %s — %s", job.get("company"), job.get("title"))
             except SalesforceExpiredSession:
@@ -117,8 +170,9 @@ def run(keywords: str, limit: int, dry_run: bool) -> dict:
         pg_conn.close()
 
     logger.info(
-        "Pipeline complete: found=%d new=%d parsed=%d qualified=%d pushed=%d skipped=%d failed=%d",
-        summary["found"], summary["new"], summary["parsed"],
+        "Pipeline complete: found=%d new=%d parsed=%d salary_filtered=%d qualified=%d "
+        "pushed=%d skipped=%d failed=%d",
+        summary["found"], summary["new"], summary["parsed"], summary["salary_filtered"],
         summary["qualified"], summary["pushed"], summary["skipped"], summary["failed"],
     )
     return summary

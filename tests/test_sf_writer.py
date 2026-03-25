@@ -32,6 +32,24 @@ def _make_job(**overrides):
         "website_url": "https://acmecorp.com",
         "sf_job_app_id": None,
         "sf_account_id": None,
+        # Recruiter
+        "recruiter_name": None,
+        "recruiter_email": None,
+        "recruiter_is_internal": True,
+        "recruiter_firm_name": None,
+        "recruiter_firm_mission": None,
+        "recruiter_firm_values": [],
+        "recruiter_firm_website": None,
+        "recruiter_firm_hq": None,
+        "sf_recruiter_account_id": None,
+        "sf_recruiter_contact_id": None,
+        # Salary
+        "annual_salary_min": None,
+        "annual_salary_max": None,
+        "hourly_rate_min": None,
+        "hourly_rate_max": None,
+        "salary_range_text": None,
+        "salary_type": None,
     }
     base.update(overrides)
     return base
@@ -71,6 +89,10 @@ class MockSF:
     @property
     def Job_Application__c(self):
         return self._Object("new_job_app_id_001", self.job_app_created)
+
+    @property
+    def Contact(self):
+        return self._Object("new_contact_id_001", [])
 
 
 def test_upsert_account_creates_new_when_not_found(monkeypatch):
@@ -139,7 +161,7 @@ def test_create_job_application_truncates_description(monkeypatch):
     assert len(payload["Job_Description__c"]) <= 32768
 
 
-def test_write_job_returns_both_ids(monkeypatch):
+def test_write_job_returns_three_tuple(monkeypatch):
     _set_env(monkeypatch)
     sys.modules.pop("job_finder.config", None)
     sys.modules.pop("job_finder.sf_writer", None)
@@ -148,8 +170,10 @@ def test_write_job_returns_both_ids(monkeypatch):
     sf = MockSF(existing_account_id=None)
     job = _make_job()
 
-    job_app_id, account_id = sf_writer.write_job(sf, job)
+    result = sf_writer.write_job(sf, job)
 
+    assert len(result) == 3
+    job_app_id, account_id, _ = result
     assert job_app_id == "new_job_app_id_001"
     assert account_id == "new_account_id_001"
 

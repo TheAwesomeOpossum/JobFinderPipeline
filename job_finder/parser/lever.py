@@ -6,6 +6,8 @@ from datetime import datetime
 
 import requests
 
+from job_finder.salary_extractor import extract_lever_salary
+
 logger = logging.getLogger(__name__)
 
 _LV_RE = re.compile(r'jobs\.lever\.co/([^/]+)/([^/?]+)')
@@ -56,6 +58,18 @@ def parse(raw: dict) -> dict | None:
     description_html = data.get("description", "") or ""
     company = data.get("company") or company_slug
 
+    # Recruiter: Lever exposes hiring_managers in the public posting response
+    hiring_managers = data.get("hiring_managers") or []
+    if hiring_managers and isinstance(hiring_managers, list):
+        hm = hiring_managers[0]
+        recruiter_name  = hm.get("name") or None
+        recruiter_email = hm.get("email") or None
+    else:
+        recruiter_name  = None
+        recruiter_email = None
+
+    salary = extract_lever_salary(data.get("salary") or {})
+
     return {
         **raw,
         "title":            data.get("text", raw.get("title", "")),
@@ -73,4 +87,17 @@ def parse(raw: dict) -> dict | None:
         "website_url":      None,
         "sf_job_app_id":    None,
         "sf_account_id":    None,
+        # Recruiter
+        "recruiter_name":           recruiter_name,
+        "recruiter_email":          recruiter_email,
+        "recruiter_is_internal":    None,
+        "recruiter_firm_name":      None,
+        "recruiter_firm_mission":   None,
+        "recruiter_firm_values":    [],
+        "recruiter_firm_website":   None,
+        "recruiter_firm_hq":        None,
+        "sf_recruiter_account_id":  None,
+        "sf_recruiter_contact_id":  None,
+        # Salary
+        **salary,
     }

@@ -45,18 +45,34 @@ def insert_job_lead(conn, job: dict) -> int:
         return result[0] if result else 0
 
 
-def mark_pushed(conn, url_hash: str, sf_job_app_id: str, sf_account_id: str) -> None:
-    """Update job_lead status to 'pushed' with Salesforce IDs."""
+def mark_pushed(
+    conn,
+    url_hash: str,
+    sf_job_app_id: str,
+    sf_account_id: str,
+    sf_recruiter_contact_id: str | None = None,
+    annual_salary: float | None = None,
+    salary_range_text: str | None = None,
+) -> None:
+    """Update job_lead status to 'pushed' with Salesforce IDs and salary data."""
     sql = """
         UPDATE job_lead
-        SET status = 'pushed', sf_job_app_id = %(sf_job_app_id)s, sf_account_id = %(sf_account_id)s
+        SET status = 'pushed',
+            sf_job_app_id = %(sf_job_app_id)s,
+            sf_account_id = %(sf_account_id)s,
+            sf_recruiter_contact_id = %(sf_recruiter_contact_id)s,
+            annual_salary = %(annual_salary)s,
+            salary_range_text = %(salary_range_text)s
         WHERE url_hash = %(url_hash)s
     """
     with conn.cursor() as cur:
         cur.execute(sql, {
-            "url_hash":      url_hash,
-            "sf_job_app_id": sf_job_app_id,
-            "sf_account_id": sf_account_id,
+            "url_hash":               url_hash,
+            "sf_job_app_id":          sf_job_app_id,
+            "sf_account_id":          sf_account_id,
+            "sf_recruiter_contact_id": sf_recruiter_contact_id,
+            "annual_salary":          annual_salary,
+            "salary_range_text":      salary_range_text,
         })
         conn.commit()
 

@@ -5,6 +5,8 @@ import logging
 import requests
 from bs4 import BeautifulSoup, Comment
 
+from job_finder.salary_extractor import extract_salary_from_text
+
 logger = logging.getLogger(__name__)
 
 _DESCRIPTION_MAX_CHARS = 5000
@@ -54,6 +56,8 @@ def parse(raw: dict) -> dict | None:
     visible_text = soup.get_text(" ", strip=True)
     description = visible_text[:_DESCRIPTION_MAX_CHARS]
 
+    salary = extract_salary_from_text(description)
+
     return {
         **raw,
         "title":            title,
@@ -70,4 +74,17 @@ def parse(raw: dict) -> dict | None:
         "website_url":      None,
         "sf_job_app_id":    None,
         "sf_account_id":    None,
+        # Recruiter — not available from generic HTML pages
+        "recruiter_name":           None,
+        "recruiter_email":          None,
+        "recruiter_is_internal":    None,
+        "recruiter_firm_name":      None,
+        "recruiter_firm_mission":   None,
+        "recruiter_firm_values":    [],
+        "recruiter_firm_website":   None,
+        "recruiter_firm_hq":        None,
+        "sf_recruiter_account_id":  None,
+        "sf_recruiter_contact_id":  None,
+        # Salary (extracted from description text)
+        **salary,
     }

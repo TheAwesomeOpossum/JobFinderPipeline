@@ -38,5 +38,9 @@ DEFAULT_KEYWORDS    = os.getenv("DEFAULT_KEYWORDS", "Software Developer,Software
 LOCATION_PREFERENCE = os.getenv("LOCATION_PREFERENCE", "Remote")
 SENIORITY_TARGETS   = [s.strip().lower() for s in os.getenv("SENIORITY_TARGETS", "mid,senior").split(",")]
 
+# Salary threshold — jobs with a known max salary below this are hard-filtered
+# Set to 0 (default) to disable filtering
+MIN_ANNUAL_SALARY = float(os.getenv("MIN_ANNUAL_SALARY", "0"))
+
 # Logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

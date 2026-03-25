@@ -81,6 +81,42 @@ def test_mark_pushed_updates_status(monkeypatch):
     assert "pushed" in sql_called
 
 
+def test_mark_pushed_with_recruiter_and_salary(monkeypatch):
+    """mark_pushed must accept and write sf_recruiter_contact_id and salary fields."""
+    _set_env(monkeypatch)
+    sys.modules.pop("job_finder.config", None)
+    sys.modules.pop("job_finder.db", None)
+    from job_finder import db
+
+    conn, cursor = _make_conn()
+    db.mark_pushed(
+        conn, "abc123", "sf_app_id", "sf_acc_id",
+        sf_recruiter_contact_id="sf_contact_id",
+        annual_salary=100000.0,
+        salary_range_text="$80k-$120k/yr",
+    )
+
+    conn.commit.assert_called_once()
+    params = cursor.execute.call_args[0][1]
+    assert params["sf_recruiter_contact_id"] == "sf_contact_id"
+    assert params["annual_salary"] == 100000.0
+    assert params["salary_range_text"] == "$80k-$120k/yr"
+
+
+def test_mark_pushed_with_none_recruiter(monkeypatch):
+    """sf_recruiter_contact_id defaults to None — should not raise."""
+    _set_env(monkeypatch)
+    sys.modules.pop("job_finder.config", None)
+    sys.modules.pop("job_finder.db", None)
+    from job_finder import db
+
+    conn, cursor = _make_conn()
+    db.mark_pushed(conn, "abc123", "sf_app_id", "sf_acc_id")
+
+    params = cursor.execute.call_args[0][1]
+    assert params["sf_recruiter_contact_id"] is None
+
+
 def test_mark_skipped_updates_status(monkeypatch):
     _set_env(monkeypatch)
     sys.modules.pop("job_finder.config", None)

@@ -117,3 +117,135 @@ def test_enrich_company_returns_empty_on_exception(monkeypatch):
     assert result["core_values"] == []
     assert result["website_url"] is None
     assert result["hq_address"] is None
+
+
+# ---------------------------------------------------------------------------
+# determine_recruiter_context
+# ---------------------------------------------------------------------------
+
+RECRUITER_INTERNAL_RESULT = {
+    "is_internal": True,
+    "confidence": "high",
+    "recruiter_firm_name": None,
+}
+
+RECRUITER_EXTERNAL_RESULT = {
+    "is_internal": False,
+    "confidence": "high",
+    "recruiter_firm_name": "TEKsystems",
+}
+
+
+def _make_mock_anthropic_recruiter(result_dict):
+    class MockContent:
+        text = json.dumps(result_dict)
+    class MockResponse:
+        content = [MockContent()]
+    class MockMessages:
+        def create(self, **kwargs):
+            return MockResponse()
+    class MockClient:
+        messages = MockMessages()
+    return MockClient()
+
+
+def test_determine_recruiter_context_internal(monkeypatch):
+    _set_env(monkeypatch)
+    sys.modules.pop("job_finder.config", None)
+    sys.modules.pop("job_finder.enrichment", None)
+    from job_finder import enrichment
+
+    monkeypatch.setattr(
+        "job_finder.enrichment.anthropic.Anthropic",
+        lambda **kw: _make_mock_anthropic_recruiter(RECRUITER_INTERNAL_RESULT)
+    )
+
+    result = enrichment.determine_recruiter_context("Jane Smith", "jane@acme.com", "Acme Corp")
+
+    assert result["is_internal"] is True
+    assert result["recruiter_firm_name"] is None
+
+
+def test_determine_recruiter_context_external(monkeypatch):
+    _set_env(monkeypatch)
+    sys.modules.pop("job_finder.config", None)
+    sys.modules.pop("job_finder.enrichment", None)
+    from job_finder import enrichment
+
+    monkeypatch.setattr(
+        "job_finder.enrichment.anthropic.Anthropic",
+        lambda **kw: _make_mock_anthropic_recruiter(RECRUITER_EXTERNAL_RESULT)
+    )
+
+    result = enrichment.determine_recruiter_context("Bob Recruiter", None, "Acme Corp")
+
+    assert result["is_internal"] is False
+    assert result["recruiter_firm_name"] == "TEKsystems"
+
+
+def test_determine_recruiter_context_defaults_to_internal_on_failure(monkeypatch):
+    _set_env(monkeypatch)
+    sys.modules.pop("job_finder.config", None)
+    sys.modules.pop("job_finder.enrichment", None)
+    from job_finder import enrichment
+
+    class BrokenClient:
+        class messages:
+            @staticmethod
+            def create(**kwargs):
+                raise RuntimeError("API down")
+
+    monkeypatch.setattr("job_finder.enrichment.anthropic.Anthropic", lambda **kw: BrokenClient())
+
+    result = enrichment.determine_recruiter_context("Jane Smith", None, "Acme Corp")
+
+    assert result["is_internal"] is True
+    assert result["recruiter_firm_name"] is None
+
+
+def test_enrich_recruiter_jobs_skips_jobs_without_recruiter(monkeypatch):
+    _set_env(monkeypatch)
+    sys.modules.pop("job_finder.config", None)
+    sys.modules.pop("job_finder.enrichment", None)
+    from job_finder import enrichment
+
+    call_count = {"n": 0}
+    def mock_ctx(name, email, company):
+        call_count["n"] += 1
+        return RECRUITER_INTERNAL_RESULT
+
+    monkeypatch.setattr(enrichment, "determine_recruiter_context", mock_ctx)
+
+    jobs = [
+        {"company": "Acme", "recruiter_name": None, "recruiter_email": None},
+        {"company": "Acme", "recruiter_name": "Jane", "recruiter_email": None,
+         "recruiter_is_internal": None, "recruiter_firm_name": None},
+    ]
+    enrichment.enrich_recruiter_jobs(jobs)
+
+    assert call_count["n"] == 1  # only the job with recruiter_name
+
+
+def test_enrich_recruiter_jobs_external_triggers_firm_enrichment(monkeypatch):
+    _set_env(monkeypatch)
+    sys.modules.pop("job_finder.config", None)
+    sys.modules.pop("job_finder.enrichment", None)
+    from job_finder import enrichment
+
+    monkeypatch.setattr(enrichment, "determine_recruiter_context",
+                        lambda n, e, c: RECRUITER_EXTERNAL_RESULT)
+    firm_calls = {"n": 0}
+    def mock_enrich(firm_name):
+        firm_calls["n"] += 1
+        return dict(ENRICHMENT_RESULT)
+    monkeypatch.setattr(enrichment, "enrich_company", mock_enrich)
+
+    job = {"company": "Acme", "recruiter_name": "Bob", "recruiter_email": None,
+           "recruiter_is_internal": None, "recruiter_firm_name": None,
+           "recruiter_firm_mission": None, "recruiter_firm_values": [],
+           "recruiter_firm_website": None, "recruiter_firm_hq": None}
+    enrichment.enrich_recruiter_jobs([job])
+
+    assert firm_calls["n"] == 1
+    assert job["recruiter_firm_name"] == "TEKsystems"
+    assert job["recruiter_is_internal"] is False

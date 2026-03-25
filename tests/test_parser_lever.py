@@ -14,6 +14,22 @@ LEVER_RESPONSE = {
     "descriptionPlain": "We are looking for a senior software engineer.",
     "description": "<p>We are looking for a senior software engineer.</p>",
     "createdAt": 1742860800000,  # 2025-03-25 in ms epoch
+    "hiring_managers": [
+        {
+            "id": "hm-001",
+            "name": "Alice Johnson",
+            "email": "alice@leverinc.com",
+            "username": "alice.johnson",
+            "accessRole": "team_member",
+            "photo": "https://photos.example.com/alice.jpg",
+        }
+    ],
+    "salary": {
+        "min": 80000,
+        "max": 120000,
+        "currency": "USD",
+        "interval": "per-year",
+    },
 }
 
 
@@ -140,3 +156,105 @@ def test_parse_missing_created_at_gives_none_posted_at(monkeypatch):
     result = lever.parse(raw)
     assert result is not None
     assert result["posted_at"] is None
+
+
+def test_parse_extracts_hiring_manager_as_recruiter(monkeypatch):
+    """hiring_managers[0] should populate recruiter_name and recruiter_email."""
+    _set_env(monkeypatch)
+    sys.modules.pop("job_finder.config", None)
+    from job_finder.parser import lever
+
+    mock_response = type("R", (), {
+        "raise_for_status": lambda self: None,
+        "json": lambda self: LEVER_RESPONSE,
+    })()
+
+    monkeypatch.setattr("job_finder.parser.lever.requests.get", lambda *a, **kw: mock_response)
+
+    raw = {"url": "https://jobs.lever.co/acme/abc-123", "title": "", "snippet": "", "ats_type": "lever", "url_hash": ""}
+    result = lever.parse(raw)
+
+    assert result["recruiter_name"] == "Alice Johnson"
+    assert result["recruiter_email"] == "alice@leverinc.com"
+    assert result["recruiter_is_internal"] is None  # not yet determined by enrichment
+
+
+def test_parse_recruiter_none_when_no_hiring_managers(monkeypatch):
+    """When hiring_managers is absent or empty, recruiter fields are None."""
+    _set_env(monkeypatch)
+    sys.modules.pop("job_finder.config", None)
+    from job_finder.parser import lever
+
+    resp_no_hm = {k: v for k, v in LEVER_RESPONSE.items() if k != "hiring_managers"}
+    monkeypatch.setattr("job_finder.parser.lever.requests.get", lambda *a, **kw: type("R", (), {
+        "raise_for_status": lambda self: None,
+        "json": lambda self: resp_no_hm,
+    })())
+
+    raw = {"url": "https://jobs.lever.co/acme/abc-123", "title": "", "snippet": "", "ats_type": "lever", "url_hash": ""}
+    result = lever.parse(raw)
+
+    assert result["recruiter_name"] is None
+    assert result["recruiter_email"] is None
+
+
+def test_parse_extracts_annual_salary(monkeypatch):
+    """salary object with per-year interval → annual_salary_min/max."""
+    _set_env(monkeypatch)
+    sys.modules.pop("job_finder.config", None)
+    from job_finder.parser import lever
+
+    monkeypatch.setattr("job_finder.parser.lever.requests.get", lambda *a, **kw: type("R", (), {
+        "raise_for_status": lambda self: None,
+        "json": lambda self: LEVER_RESPONSE,
+    })())
+
+    raw = {"url": "https://jobs.lever.co/acme/abc-123", "title": "", "snippet": "", "ats_type": "lever", "url_hash": ""}
+    result = lever.parse(raw)
+
+    assert result["annual_salary_min"] == 80000.0
+    assert result["annual_salary_max"] == 120000.0
+    assert result["salary_type"] == "annual"
+    assert result["salary_range_text"] == "$80k-$120k/yr"
+
+
+def test_parse_salary_none_when_salary_absent(monkeypatch):
+    """When salary field is missing, all salary dict values should be None."""
+    _set_env(monkeypatch)
+    sys.modules.pop("job_finder.config", None)
+    from job_finder.parser import lever
+
+    resp_no_salary = {k: v for k, v in LEVER_RESPONSE.items() if k != "salary"}
+    monkeypatch.setattr("job_finder.parser.lever.requests.get", lambda *a, **kw: type("R", (), {
+        "raise_for_status": lambda self: None,
+        "json": lambda self: resp_no_salary,
+    })())
+
+    raw = {"url": "https://jobs.lever.co/acme/abc-123", "title": "", "snippet": "", "ats_type": "lever", "url_hash": ""}
+    result = lever.parse(raw)
+
+    assert result["annual_salary_min"] is None
+    assert result["annual_salary_max"] is None
+    assert result["salary_type"] is None
+
+
+def test_parse_extracts_hourly_salary(monkeypatch):
+    """salary with per-hour interval → hourly_rate_min/max."""
+    _set_env(monkeypatch)
+    sys.modules.pop("job_finder.config", None)
+    from job_finder.parser import lever
+
+    hourly_response = dict(LEVER_RESPONSE)
+    hourly_response["salary"] = {"min": 40, "max": 60, "currency": "USD", "interval": "per-hour"}
+
+    monkeypatch.setattr("job_finder.parser.lever.requests.get", lambda *a, **kw: type("R", (), {
+        "raise_for_status": lambda self: None,
+        "json": lambda self: hourly_response,
+    })())
+
+    raw = {"url": "https://jobs.lever.co/acme/abc-123", "title": "", "snippet": "", "ats_type": "lever", "url_hash": ""}
+    result = lever.parse(raw)
+
+    assert result["hourly_rate_min"] == 40.0
+    assert result["hourly_rate_max"] == 60.0
+    assert result["salary_type"] == "hourly"

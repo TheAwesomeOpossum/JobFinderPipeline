@@ -59,8 +59,8 @@ def main():
 
     print(
         f"\nSummary: found={summary['found']} new={summary['new']} parsed={summary['parsed']} "
-        f"qualified={summary['qualified']} pushed={summary['pushed']} "
-        f"skipped={summary['skipped']} failed={summary['failed']}"
+        f"salary_filtered={summary['salary_filtered']} qualified={summary['qualified']} "
+        f"pushed={summary['pushed']} skipped={summary['skipped']} failed={summary['failed']}"
     )
 
     sys.exit(1 if summary.get("failed", 0) > 0 else 0)
