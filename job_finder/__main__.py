@@ -15,8 +15,23 @@ def main():
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
+    # ── Two-pass: pre-parse --profile before setting argparse defaults ──
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("--profile")
+    pre_args, _ = pre.parse_known_args()
+
+    profile_data: dict = {}
+    if pre_args.profile:
+        from job_finder.profiles import load_profile
+        profile_data = load_profile(pre_args.profile)
+    # ── End profile pre-parse ──
+
     parser = argparse.ArgumentParser(
         description="JobFinder — discover freshly posted engineering jobs"
+    )
+    parser.add_argument(
+        "--profile",
+        help="Path to YAML profile file (overrides env defaults, overridden by explicit flags)",
     )
     parser.add_argument(
         "--dry-run",
@@ -25,13 +40,13 @@ def main():
     )
     parser.add_argument(
         "--keywords",
-        default=config.DEFAULT_KEYWORDS,
+        default=profile_data.get("keywords", config.DEFAULT_KEYWORDS),
         help="Comma-separated search keywords (default: %(default)s)",
     )
     parser.add_argument(
         "--limit",
         type=int,
-        default=config.DAILY_LIMIT,
+        default=profile_data.get("limit", config.DAILY_LIMIT),
         help="Max jobs to push to Salesforce (default: %(default)s)",
     )
     args = parser.parse_args()

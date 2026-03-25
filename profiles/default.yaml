@@ -1,0 +1,7 @@
+# Default profile: broad software engineering search
+keywords: "Software Developer,Software Engineer"
+limit: 20
+location_preference: "Remote"
+seniority_targets: "mid,senior"
+schedule_hour: 2
+schedule_minute: 0

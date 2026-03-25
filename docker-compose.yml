@@ -1,0 +1,21 @@
+name: job-finder
+
+services:
+  scheduler:
+    build: .
+    container_name: jf_scheduler
+    restart: unless-stopped
+    init: true          # Injects tini as PID 1 — ensures SIGTERM reaches Python
+    stop_grace_period: 120s  # Give running pipeline jobs 2 min to finish before SIGKILL
+    env_file: .env
+    environment:
+      - TZ=UTC          # Container OS timezone — keep consistent with APScheduler UTC
+    volumes:
+      - ./profiles:/app/profiles:ro
+      - ./logs:/app/logs
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+        compress: "true"
