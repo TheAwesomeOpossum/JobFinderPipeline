@@ -49,12 +49,25 @@ def main():
         default=profile_data.get("limit", config.DAILY_LIMIT),
         help="Max jobs to push to Salesforce (default: %(default)s)",
     )
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=1,
+        help="How many days back to search for job postings (default: 1)",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="In dry-run mode, print all scored jobs (qualified + skipped)",
+    )
     args = parser.parse_args()
 
     summary = orchestrator.run(
         keywords=args.keywords,
         limit=args.limit,
         dry_run=args.dry_run,
+        days=args.days,
+        verbose=args.verbose,
     )
 
     print(

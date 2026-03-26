@@ -1,6 +1,8 @@
 """BeautifulSoup fallback parser for Workday, Ashby, SmartRecruiters, and unknown ATS."""
 
 import logging
+import re
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup, Comment
@@ -11,6 +13,20 @@ logger = logging.getLogger(__name__)
 
 _DESCRIPTION_MAX_CHARS = 5000
 _NOISE_TAGS = ["script", "style", "nav", "footer", "header", "noscript"]
+
+
+def _company_from_url(url: str) -> str:
+    """Extract company name from ATS URL path segment."""
+    try:
+        path = urlparse(url).path.lstrip("/")
+        slug = path.split("/")[0]
+        # Remove trailing digits (e.g. "Tietoevry1" → "Tietoevry")
+        slug = re.sub(r'\d+$', '', slug)
+        # Convert kebab-case/CamelCase to readable: "my-company" → "My Company"
+        slug = re.sub(r'[-_]', ' ', slug)
+        return slug.strip()
+    except Exception:
+        return ""
 
 
 def can_parse(url: str) -> bool:
@@ -41,17 +57,24 @@ def parse(raw: dict) -> dict | None:
     for comment in soup.find_all(string=lambda t: isinstance(t, Comment)):
         comment.extract()
 
-    # Extract title: split on " | " or " - " and take first part
+    # Extract title and company from page <title>
+    # Common formats: "Job Title | Company" or "Job Title - Company | ATS" or "Job Title at Company"
     title_tag = soup.find("title")
+    company_from_title = ""
     if title_tag and title_tag.string:
         raw_title = title_tag.string.strip()
         for sep in [" | ", " - ", " – "]:
             if sep in raw_title:
-                raw_title = raw_title.split(sep)[0].strip()
+                parts = raw_title.split(sep)
+                raw_title = parts[0].strip()
+                if len(parts) > 1:
+                    company_from_title = parts[1].strip()
                 break
         title = raw_title
     else:
         title = raw.get("title", "")
+
+    company = raw.get("company") or _company_from_url(url) or company_from_title
 
     visible_text = soup.get_text(" ", strip=True)
     description = visible_text[:_DESCRIPTION_MAX_CHARS]
@@ -60,6 +83,7 @@ def parse(raw: dict) -> dict | None:
 
     return {
         **raw,
+        "company":          company,
         "title":            title,
         "description":      description,
         "description_html": str(soup),

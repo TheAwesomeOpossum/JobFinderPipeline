@@ -87,7 +87,7 @@ class MockSF:
         return self._Object("new_account_id_001", self.account_created)
 
     @property
-    def Job_Application__c(self):
+    def JobApplication__c(self):
         return self._Object("new_job_app_id_001", self.job_app_created)
 
     @property

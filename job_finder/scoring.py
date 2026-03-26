@@ -9,10 +9,12 @@ from job_finder import config
 logger = logging.getLogger(__name__)
 
 
-def score(job: dict) -> int:
+def score(job: dict, keywords: str | None = None) -> int:
     """
     Score a job 0–100 based on keyword, location, seniority, and recency signals.
     Mutates job["score"] and returns the score.
+
+    keywords: comma-separated search keywords; falls back to config.DEFAULT_KEYWORDS.
     """
     total = 0
     title = (job.get("title") or "").lower()
@@ -20,28 +22,59 @@ def score(job: dict) -> int:
     location = (job.get("location") or "").lower()
     posted_at = job.get("posted_at")
 
-    keywords = [kw.strip().lower() for kw in config.DEFAULT_KEYWORDS.split(",") if kw.strip()]
+    kw_source = keywords or config.DEFAULT_KEYWORDS
+    kw_list = [kw.strip().lower() for kw in kw_source.split(",") if kw.strip()]
 
-    # Signal 1: keyword in title (max 30)
-    if any(kw in title for kw in keywords):
+    def _kw_match(text: str) -> bool:
+        """Match keyword if ALL tokens are present in any order (e.g. 'salesforce developer'
+        matches 'Lead Developer - Salesforce' because both tokens appear in the title)."""
+        for kw in kw_list:
+            tokens = kw.split()
+            if all(token in text for token in tokens):
+                return True
+        return False
+
+    # Signal 1: keyword tokens in title (max 30)
+    if _kw_match(title):
         total += 30
 
     # Signal 2: keyword in description (max 20)
-    if any(kw in description for kw in keywords):
+    if _kw_match(description):
         total += 20
 
     # Signal 3: location match (max 20)
+    # Check both the structured location field and description text
     location_pref = config.LOCATION_PREFERENCE.lower()
-    if "remote" in location or location_pref in location:
+    combined_location = location + " " + description
+    if "remote" in combined_location or location_pref in combined_location:
         total += 20
+    # Bonus for explicit US location signals
+    if re.search(r'\b(united states|usa|\bus\b|u\.s\.)\b', combined_location):
+        total += 10
+    # Penalty for non-US locations — must be willing to hire US workers
+    if re.search(
+        r'\b(uk|united kingdom|germany|deutschland|canada|india|australia|europe|'
+        r'netherlands|france|poland|sweden|denmark|norway|finland|ireland|spain|'
+        r'portugal|italy|austria|switzerland)\b',
+        combined_location,
+    ):
+        total -= 25
 
     # Signal 4: seniority match (max 20, -10 penalty for junior/entry)
     seniority_targets = config.SENIORITY_TARGETS  # already lowercased list
     combined_text = title + " " + description
-    if any(s in combined_text for s in seniority_targets):
+    if any(s in combined_text for s in seniority_targets) or re.search(
+        r'\bsr\b|\bii\b|\biii\b|\biv\b', title
+    ):
         total += 20
-    if re.search(r'\bjunior\b|\bentry.level\b|\bentry level\b', combined_text):
+    if re.search(r'\bjunior\b|\bentry.level\b|\bentry level\b|\binternship\b|\bintern\b', combined_text):
         total -= 10
+
+    # Signal 5.5: technical role type — bonus for developer/engineer titles, penalty otherwise
+    if re.search(r'\bdeveloper\b|\bengineer\b|\barchitect\b|\btechnical\b', title):
+        total += 15
+    else:
+        total -= 20
 
     # Signal 5: recent posting (max 10)
     if posted_at:

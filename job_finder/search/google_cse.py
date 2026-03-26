@@ -13,7 +13,17 @@ MAX_RESULTS_PER_QUERY = 100
 PAGE_SIZE = 10
 
 
-def search_one_site(domain: str, ats_type: str, keywords: str, max_results: int = 10) -> list[dict]:
+def _tbs_for_days(days: int) -> str:
+    """Convert a day count to a Serper/Google tbs date-restrict string."""
+    if days <= 1:
+        return "qdr:d"
+    if days <= 7:
+        return f"qdr:d{days}"
+    weeks = days // 7
+    return f"qdr:w{weeks}" if weeks > 1 else "qdr:w"
+
+
+def search_one_site(domain: str, ats_type: str, keywords: str, max_results: int = 10, days: int = 1) -> list[dict]:
     """
     Query Serper for a single ATS domain.
     Returns a list of raw result dicts with url, title, snippet, ats_type.
@@ -28,7 +38,7 @@ def search_one_site(domain: str, ats_type: str, keywords: str, max_results: int 
             "q":    query,
             "num":  PAGE_SIZE,
             "page": page,
-            "tbs":  "qdr:d",
+            "tbs":  _tbs_for_days(days),
         }
         headers = {"X-API-KEY": config.SERPER_API_KEY, "Content-Type": "application/json"}
         try:
@@ -62,7 +72,7 @@ def search_one_site(domain: str, ats_type: str, keywords: str, max_results: int 
     return results
 
 
-def search_all_ats(keywords: str, max_per_site: int = 10) -> list[dict]:
+def search_all_ats(keywords: str, max_per_site: int = 10, days: int = 1) -> list[dict]:
     """
     Query all registered ATS sites and return a combined flat list of raw results.
     """
@@ -73,6 +83,7 @@ def search_all_ats(keywords: str, max_per_site: int = 10) -> list[dict]:
             ats_type=site["ats_type"],
             keywords=keywords,
             max_results=max_per_site,
+            days=days,
         )
         all_results.extend(site_results)
     logger.info("search_all_ats total=%d results across %d sites", len(all_results), len(ATS_SITES))

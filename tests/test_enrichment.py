@@ -23,12 +23,13 @@ ENRICHMENT_RESULT = {
 
 
 def _make_mock_anthropic(result_dict):
-    """Build a mock anthropic.Anthropic() client that returns result_dict as JSON text."""
-    class MockContent:
-        text = json.dumps(result_dict)
+    """Build a mock anthropic.Anthropic() client that returns result_dict via tool_use block."""
+    class MockToolBlock:
+        type = "tool_use"
+        input = result_dict
 
     class MockResponse:
-        content = [MockContent()]
+        content = [MockToolBlock()]
 
     class MockMessages:
         def create(self, **kwargs):
@@ -137,10 +138,11 @@ RECRUITER_EXTERNAL_RESULT = {
 
 
 def _make_mock_anthropic_recruiter(result_dict):
-    class MockContent:
-        text = json.dumps(result_dict)
+    class MockToolBlock:
+        type = "tool_use"
+        input = result_dict
     class MockResponse:
-        content = [MockContent()]
+        content = [MockToolBlock()]
     class MockMessages:
         def create(self, **kwargs):
             return MockResponse()

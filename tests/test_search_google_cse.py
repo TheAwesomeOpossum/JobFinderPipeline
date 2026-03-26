@@ -87,7 +87,7 @@ def test_search_all_ats_combines_results(monkeypatch):
 
     call_domains = []
 
-    def mock_search_one(domain, ats_type, keywords, max_results=10):
+    def mock_search_one(domain, ats_type, keywords, max_results=10, days=1):
         call_domains.append(domain)
         return [{"url": f"https://{domain}/job/1", "title": "Job", "snippet": "", "ats_type": ats_type}]
 

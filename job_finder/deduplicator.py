@@ -47,7 +47,7 @@ def is_duplicate(conn, sf, url: str) -> bool:
     try:
         safe_url = url.replace("'", "\\'")
         result = sf.query(
-            f"SELECT Id FROM Job_Application__c WHERE Job_Posting_URL__c = '{safe_url}' LIMIT 1"
+            f"SELECT Id FROM JobApplication__c WHERE Job_Posting_URL__c = '{safe_url}' LIMIT 1"
         )
         if result["totalSize"] > 0:
             logger.debug("Duplicate found in SF: %s", url)

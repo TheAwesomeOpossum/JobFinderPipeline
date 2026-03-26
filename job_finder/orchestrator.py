@@ -51,7 +51,7 @@ def _above_salary_threshold(job: dict) -> bool:
     return max(ceilings) >= threshold
 
 
-def run(keywords: str, limit: int, dry_run: bool) -> dict:
+def run(keywords: str, limit: int, dry_run: bool, days: int = 1, verbose: bool = False) -> dict:
     """
     Execute the full job discovery pipeline.
 
@@ -76,7 +76,7 @@ def run(keywords: str, limit: int, dry_run: bool) -> dict:
             sf = sf_writer.connect()
 
         # Stage 1: Search
-        raw_results = google_cse.search_all_ats(keywords, max_per_site=10)
+        raw_results = google_cse.search_all_ats(keywords, max_per_site=10, days=days)
         summary["found"] = len(raw_results)
         logger.info("Found %d raw results from Google CSE", len(raw_results))
 
@@ -103,9 +103,9 @@ def run(keywords: str, limit: int, dry_run: bool) -> dict:
         summary["parsed"] = len(parsed_jobs)
         logger.info("%d jobs parsed successfully", len(parsed_jobs))
 
-        # Stage 4: Score and sort
+        # Stage 4: Score and sort (pass runtime keywords so scoring aligns with search)
         for job in parsed_jobs:
-            score(job)
+            score(job, keywords=keywords)
         parsed_jobs.sort(key=lambda j: j.get("score", 0), reverse=True)
 
         # Stage 4.5: Hard salary threshold filter (never reaches job_lead)
@@ -136,6 +136,31 @@ def run(keywords: str, limit: int, dry_run: bool) -> dict:
 
         if dry_run:
             logger.info("Dry run complete. Would push %d jobs to Salesforce.", len(qualified))
+            logger.info("--- Qualified jobs (would be pushed) ---")
+            for i, job in enumerate(qualified, 1):
+                salary_info = job.get("salary_range_text") or ""
+                logger.info(
+                    "  %d. [score=%d] %s @ %s%s\n     %s",
+                    i,
+                    job.get("score", 0),
+                    job.get("title", "?"),
+                    job.get("company", "?"),
+                    f"  {salary_info}" if salary_info else "",
+                    job.get("url", ""),
+                )
+            if verbose and skipped:
+                logger.info("--- Skipped jobs (scored too low) ---")
+                for i, job in enumerate(skipped, 1):
+                    salary_info = job.get("salary_range_text") or ""
+                    logger.info(
+                        "  %d. [score=%d] %s @ %s%s\n     %s",
+                        i,
+                        job.get("score", 0),
+                        job.get("title", "?"),
+                        job.get("company", "?"),
+                        f"  {salary_info}" if salary_info else "",
+                        job.get("url", ""),
+                    )
             return summary
 
         # Stage 7: Enrich companies (one Claude call per unique company)

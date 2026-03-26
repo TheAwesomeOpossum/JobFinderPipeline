@@ -1,6 +1,5 @@
 """Claude API company research and recruiter context enrichment."""
 
-import json
 import logging
 
 import anthropic
@@ -33,6 +32,12 @@ _SCHEMA = {
     "additionalProperties": False,
 }
 
+_COMPANY_TOOL = {
+    "name": "company_research",
+    "description": "Return structured company research data.",
+    "input_schema": _SCHEMA,
+}
+
 _EMPTY_ENRICHMENT = {
     "mission":     None,
     "core_values": [],
@@ -55,10 +60,12 @@ def enrich_company(company_name: str) -> dict:
         response = client.messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
+            tools=[_COMPANY_TOOL],
+            tool_choice={"type": "tool", "name": "company_research"},
             messages=[{"role": "user", "content": prompt}],
-            output_config={"format": {"type": "json_schema", "schema": _SCHEMA}},
         )
-        return json.loads(response.content[0].text)
+        tool_block = next(b for b in response.content if b.type == "tool_use")
+        return tool_block.input
     except Exception as exc:
         logger.warning("enrich_company failed for '%s': %s", company_name, exc)
         return dict(_EMPTY_ENRICHMENT)
@@ -77,6 +84,12 @@ _RECRUITER_SCHEMA = {
     },
     "required": ["is_internal", "confidence", "recruiter_firm_name"],
     "additionalProperties": False,
+}
+
+_RECRUITER_TOOL = {
+    "name": "recruiter_context",
+    "description": "Determine whether a recruiter is internal to the company or from an external firm.",
+    "input_schema": _RECRUITER_SCHEMA,
 }
 
 _RECRUITER_DEFAULT = {
@@ -119,10 +132,12 @@ def determine_recruiter_context(
         response = client.messages.create(
             model=MODEL,
             max_tokens=256,
+            tools=[_RECRUITER_TOOL],
+            tool_choice={"type": "tool", "name": "recruiter_context"},
             messages=[{"role": "user", "content": prompt}],
-            output_config={"format": {"type": "json_schema", "schema": _RECRUITER_SCHEMA}},
         )
-        result = json.loads(response.content[0].text)
+        tool_block = next(b for b in response.content if b.type == "tool_use")
+        result = tool_block.input
         logger.debug(
             "Recruiter context for '%s' at '%s': %s", recruiter_name, company_name, result
         )

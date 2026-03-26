@@ -1,4 +1,4 @@
-"""Salesforce Account + Job_Application__c + Contact write operations."""
+"""Salesforce Account + JobApplication__c + Contact write operations."""
 
 import logging
 import time
@@ -9,6 +9,33 @@ from job_finder import config
 from job_finder.salary_extractor import annual_midpoint, hourly_midpoint
 
 logger = logging.getLogger(__name__)
+
+# Maps common country name variations → SF BillingCountry picklist codes.
+# Countries not in this map have their BillingCountry field omitted (not blocked).
+# Maps country name variations → SF BillingCountryCode integration values.
+# With State/Country Picklists enabled, BillingCountryCode uses the integration
+# value (typically ISO-2), NOT BillingCountry (which expects the full display name).
+# Only countries enabled in your SF org are valid here.
+_SF_COUNTRY_CODE_MAP = {
+    "united states": "US",
+    "united states of america": "US",
+    "usa": "US",
+    "us": "US",
+    "u.s.": "US",
+    "u.s.a.": "US",
+    "united kingdom": "UK",
+    "uk": "UK",
+    "great britain": "UK",
+    "england": "UK",
+    "britain": "UK",
+}
+
+
+def _normalize_country_code(country: str | None) -> str | None:
+    """Map a country name to the SF BillingCountryCode integration value. Returns None if unsupported."""
+    if not country:
+        return None
+    return _SF_COUNTRY_CODE_MAP.get(country.strip().lower())
 
 
 def connect() -> Salesforce:
@@ -60,19 +87,31 @@ def upsert_account(sf: Salesforce, job: dict) -> str:
     safe_name = job.get("company", "").replace("'", "\\'")
     hq = job.get("hq_address") or {}
 
+    # With SF State/Country Picklists enabled:
+    # - Use BillingCountryCode (ISO integration value), NOT BillingCountry (display name)
+    # - BillingState requires a valid BillingCountryCode first — omit it to avoid
+    #   state-code picklist validation failures on free-text values from Claude
+    # - If country can't be mapped, omit ALL billing address fields
+    billing_country_code = _normalize_country_code(hq.get("country"))
+    logger.info("upsert_account: raw country=%r → BillingCountryCode=%r", hq.get("country"), billing_country_code)
+
     payload = {
         "Name":            job.get("company", ""),
         "Type":            "Job Application",
         "Website":         website or None,
         "Company_Research__c": _build_research_text(job) or None,
-        "BillingStreet":   hq.get("street"),
-        "BillingCity":     hq.get("city"),
-        "BillingState":    hq.get("state"),
-        "BillingPostalCode": hq.get("postal_code"),
-        "BillingCountry":  hq.get("country"),
     }
+    if billing_country_code:
+        payload["BillingStreet"]      = hq.get("street")
+        payload["BillingCity"]        = hq.get("city")
+        payload["BillingPostalCode"]  = hq.get("postal_code")
+        payload["BillingCountryCode"] = billing_country_code
+    else:
+        logger.info("upsert_account: omitting billing address fields (unsupported country: %r)", hq.get("country"))
+
     # Remove None values to avoid overwriting with null
     payload = {k: v for k, v in payload.items() if v is not None}
+    logger.info("upsert_account payload: %s", payload)
 
     if website:
         safe_website = website.replace("'", "\\'")
@@ -94,7 +133,7 @@ def upsert_account(sf: Salesforce, job: dict) -> str:
 
 
 def create_job_application(sf: Salesforce, job: dict, account_id: str) -> str:
-    """Create a Job_Application__c record and return its Salesforce Id."""
+    """Create a JobApplication__c record and return its Salesforce Id."""
     payload = {
         # Do NOT set Name — Salesforce trigger auto-populates it
         "Job_Title__c":        job.get("title", ""),
@@ -111,7 +150,7 @@ def create_job_application(sf: Salesforce, job: dict, account_id: str) -> str:
     # Remove None values
     payload = {k: v for k, v in payload.items() if v is not None}
 
-    result = _with_backoff(lambda: sf.Job_Application__c.create(payload))
+    result = _with_backoff(lambda: sf.JobApplication__c.create(payload))
     return result["id"]
 
 
@@ -137,17 +176,18 @@ def upsert_recruiter_account(sf: Salesforce, job: dict) -> str:
     firm_website = job.get("recruiter_firm_website") or ""
     firm_hq      = job.get("recruiter_firm_hq") or {}
 
+    billing_country_code = _normalize_country_code(firm_hq.get("country"))
     payload = {
         "Name":                firm_name,
         "Type":                "Recruiter Account",
         "Website":             firm_website or None,
         "Company_Research__c": _build_recruiter_research_text(job),
-        "BillingStreet":       firm_hq.get("street"),
-        "BillingCity":         firm_hq.get("city"),
-        "BillingState":        firm_hq.get("state"),
-        "BillingPostalCode":   firm_hq.get("postal_code"),
-        "BillingCountry":      firm_hq.get("country"),
     }
+    if billing_country_code:
+        payload["BillingStreet"]      = firm_hq.get("street")
+        payload["BillingCity"]        = firm_hq.get("city")
+        payload["BillingPostalCode"]  = firm_hq.get("postal_code")
+        payload["BillingCountryCode"] = billing_country_code
     payload = {k: v for k, v in payload.items() if v is not None}
 
     safe_name = firm_name.replace("'", "\\'")
@@ -226,9 +266,9 @@ def write_job(sf: Salesforce, job: dict) -> tuple[str, str, str | None]:
     """
     Write a job to Salesforce:
       1. Upsert company Account (Type='Job Application')
-      2. Create Job_Application__c (with salary fields)
+      2. Create JobApplication__c (with salary fields)
       3. Upsert recruiter Contact (and Recruiter Account if external firm)
-      4. Link Recruiter__c on Job_Application__c
+      4. Link Recruiter__c on JobApplication__c
 
     Returns (sf_job_app_id, sf_account_id, sf_recruiter_contact_id).
     sf_recruiter_contact_id is None when no recruiter or if recruiter upsert failed.
@@ -253,7 +293,7 @@ def write_job(sf: Salesforce, job: dict) -> tuple[str, str, str | None]:
 
             sf_recruiter_contact_id = upsert_recruiter_contact(sf, job, recruiter_account_id)
             if sf_recruiter_contact_id:
-                _with_backoff(lambda: sf.Job_Application__c.update(
+                _with_backoff(lambda: sf.JobApplication__c.update(
                     job_app_id, {"Recruiter__c": sf_recruiter_contact_id}
                 ))
     except SalesforceExpiredSession:

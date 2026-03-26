@@ -102,7 +102,7 @@ class MockSF:
         return self._Obj("new_account_id", self.account_ops)
 
     @property
-    def Job_Application__c(self):
+    def JobApplication__c(self):
         return self._Obj("new_job_app_id", self.job_app_ops)
 
     @property
@@ -265,7 +265,7 @@ def test_write_job_sets_recruiter_on_job_application(monkeypatch):
     _, _, recruiter_contact_id = sf_writer.write_job(sf, job)
 
     assert recruiter_contact_id == "new_contact_id"
-    # Verify Job_Application__c.update was called with Recruiter__c
+    # Verify JobApplication__c.update was called with Recruiter__c
     update_calls = [op for op in sf.job_app_ops if op[0] == "update"]
     assert any("Recruiter__c" in op[2] for op in update_calls)
 
