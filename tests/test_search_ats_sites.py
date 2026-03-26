@@ -18,4 +18,3 @@ def test_build_query_includes_domain_and_keywords():
     q = build_query("boards.greenhouse.io", "Software Engineer")
     assert "site:boards.greenhouse.io" in q
     assert "Software Engineer" in q
-    assert "apply" in q

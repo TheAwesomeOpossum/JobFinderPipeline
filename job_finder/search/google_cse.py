@@ -1,4 +1,4 @@
-"""Paginated Google Custom Search API client."""
+"""Google Search client via Serper.dev API."""
 
 import logging
 import requests
@@ -8,40 +8,43 @@ from job_finder.search.ats_sites import ATS_SITES, build_query
 
 logger = logging.getLogger(__name__)
 
-CSE_ENDPOINT = "https://customsearch.googleapis.com/customsearch/v1"
+SERPER_ENDPOINT = "https://google.serper.dev/search"
 MAX_RESULTS_PER_QUERY = 100
 PAGE_SIZE = 10
 
 
 def search_one_site(domain: str, ats_type: str, keywords: str, max_results: int = 10) -> list[dict]:
     """
-    Query Google CSE for a single ATS domain.
+    Query Serper for a single ATS domain.
     Returns a list of raw result dicts with url, title, snippet, ats_type.
     """
     results = []
     cap = min(max_results, MAX_RESULTS_PER_QUERY)
     query = build_query(domain, keywords)
+    total_pages = (cap + PAGE_SIZE - 1) // PAGE_SIZE
 
-    for start in range(1, cap + 1, PAGE_SIZE):
-        params = {
-            "key":         config.GOOGLE_API_KEY,
-            "cx":          config.GOOGLE_CSE_ID,
-            "q":           query,
-            "num":         PAGE_SIZE,
-            "start":       start,
-            "dateRestrict": "d1",
+    for page in range(1, total_pages + 1):
+        payload = {
+            "q":    query,
+            "num":  PAGE_SIZE,
+            "page": page,
+            "tbs":  "qdr:d",
         }
+        headers = {"X-API-KEY": config.SERPER_API_KEY, "Content-Type": "application/json"}
         try:
-            resp = requests.get(CSE_ENDPOINT, params=params, timeout=15)
+            resp = requests.post(SERPER_ENDPOINT, json=payload, headers=headers, timeout=15)
+            if not resp.ok:
+                logger.warning("Serper request failed for domain=%s page=%d: %s — %s", domain, page, resp.status_code, resp.text[:500])
+                break
             resp.raise_for_status()
             data = resp.json()
         except Exception as exc:
-            logger.warning("CSE request failed for domain=%s start=%d: %s", domain, start, exc)
+            logger.warning("Serper request failed for domain=%s page=%d: %s", domain, page, exc)
             break
 
-        items = data.get("items")
+        items = data.get("organic")
         if not items:
-            logger.debug("No more results for domain=%s at start=%d", domain, start)
+            logger.debug("No more results for domain=%s at page=%d", domain, page)
             break
 
         for item in items:

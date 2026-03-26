@@ -11,9 +11,8 @@ def _require(key: str) -> str:
     return value
 
 
-# Google
-GOOGLE_API_KEY = _require("GOOGLE_API_KEY")
-GOOGLE_CSE_ID  = _require("GOOGLE_CSE_ID")
+# Serper
+SERPER_API_KEY = _require("SERPER_API_KEY")
 
 # Anthropic
 ANTHROPIC_API_KEY = _require("ANTHROPIC_API_KEY")

@@ -16,8 +16,7 @@ _FULL_SUMMARY = {
 
 def _set_env(monkeypatch):
     for k, v in {
-        "GOOGLE_API_KEY": "x",
-        "GOOGLE_CSE_ID": "x",
+        "SERPER_API_KEY": "x",
         "ANTHROPIC_API_KEY": "x",
         "SF_USERNAME": "x",
         "SF_PASSWORD": "x",

@@ -12,4 +12,4 @@ ATS_SITES = [
 
 def build_query(domain: str, keywords: str) -> str:
     """Build a Google CSE query string for a given ATS domain."""
-    return f'site:{domain} {keywords} intext:"apply"'
+    return f'site:{domain} {keywords}'

@@ -6,7 +6,7 @@ import pytest
 
 def _set_env(monkeypatch):
     for k, v in {
-        "GOOGLE_API_KEY": "x", "GOOGLE_CSE_ID": "x", "ANTHROPIC_API_KEY": "x",
+        "SERPER_API_KEY": "x", "ANTHROPIC_API_KEY": "x",
         "SF_USERNAME": "x", "SF_PASSWORD": "x", "SF_SECURITY_TOKEN": "x",
         "PG_DBNAME": "x", "PG_USER": "x", "PG_PASSWORD": "x",
     }.items():

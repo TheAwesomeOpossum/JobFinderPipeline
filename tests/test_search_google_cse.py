@@ -6,7 +6,7 @@ import pytest
 
 def _set_env(monkeypatch):
     for k, v in {
-        "GOOGLE_API_KEY": "test_key", "GOOGLE_CSE_ID": "test_cx", "ANTHROPIC_API_KEY": "x",
+        "SERPER_API_KEY": "test_key", "ANTHROPIC_API_KEY": "x",
         "SF_USERNAME": "x", "SF_PASSWORD": "x", "SF_SECURITY_TOKEN": "x",
         "PG_DBNAME": "x", "PG_USER": "x", "PG_PASSWORD": "x",
     }.items():
@@ -20,17 +20,18 @@ def test_search_one_site_returns_results(monkeypatch):
     from job_finder.search import google_cse
 
     mock_data = {
-        "items": [
+        "organic": [
             {"link": "https://boards.greenhouse.io/acme/jobs/1", "title": "SWE", "snippet": "Hiring..."},
             {"link": "https://boards.greenhouse.io/acme/jobs/2", "title": "PM", "snippet": "Seeking..."},
         ]
     }
 
     class MockResponse:
+        ok = True
         def raise_for_status(self): pass
         def json(self): return mock_data
 
-    monkeypatch.setattr("job_finder.search.google_cse.requests.get", lambda *a, **kw: MockResponse())
+    monkeypatch.setattr("job_finder.search.google_cse.requests.post", lambda *a, **kw: MockResponse())
 
     results = google_cse.search_one_site("boards.greenhouse.io", "greenhouse", "Software Engineer", max_results=10)
 
@@ -48,14 +49,14 @@ def test_search_one_site_stops_on_empty_items(monkeypatch):
 
     call_count = {"n": 0}
 
-    def mock_get(*a, **kw):
+    def mock_post(*a, **kw):
         call_count["n"] += 1
         return type("R", (), {
             "raise_for_status": lambda self: None,
-            "json": lambda self: {},  # no 'items'
+            "json": lambda self: {},  # no 'organic'
         })()
 
-    monkeypatch.setattr("job_finder.search.google_cse.requests.get", mock_get)
+    monkeypatch.setattr("job_finder.search.google_cse.requests.post", mock_post)
 
     results = google_cse.search_one_site("boards.greenhouse.io", "greenhouse", "Software Engineer", max_results=30)
 
@@ -70,7 +71,7 @@ def test_search_one_site_handles_http_error_gracefully(monkeypatch):
     from job_finder.search import google_cse
 
     monkeypatch.setattr(
-        "job_finder.search.google_cse.requests.get",
+        "job_finder.search.google_cse.requests.post",
         lambda *a, **kw: (_ for _ in ()).throw(Exception("HTTP error"))
     )
 
