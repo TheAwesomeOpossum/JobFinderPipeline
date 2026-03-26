@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Bonus_Skills__c</fullName>
+    <description>References Skills GVS. Each matched skill adds +5 to relevance score (max +20). Never filters out jobs. Pipeline splits on semicolon delimiter.</description>
+    <label>Bonus Skills</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>MultiselectPicklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetName>Skills</valueSetName>
+    </valueSet>
+    <visibleLines>5</visibleLines>
+</CustomField>

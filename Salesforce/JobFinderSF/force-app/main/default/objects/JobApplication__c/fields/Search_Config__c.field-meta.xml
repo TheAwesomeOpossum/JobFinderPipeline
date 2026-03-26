@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Search_Config__c</fullName>
+    <label>Search Config</label>
+    <description>Links this job application to the Job Search Config that produced it. Null for YAML-fallback runs.</description>
+    <type>Lookup</type>
+    <referenceTo>Job_Search_Config__c</referenceTo>
+    <relationshipName>Job_Applications</relationshipName>
+    <relationshipLabel>Job Applications</relationshipLabel>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <required>false</required>
+</CustomField>
