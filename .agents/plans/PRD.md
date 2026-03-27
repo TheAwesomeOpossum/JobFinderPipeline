@@ -495,6 +495,28 @@ The pipeline runs end-to-end without errors, discovers at least one real job pos
 
 ---
 
+### Phase 5 — SF-Driven Config (`Job_Search_Config__c` Integration)
+
+**Goal:** Read nightly search configurations directly from `Job_Search_Config__c` in Salesforce; YAML profiles remain as local fallback.
+
+**Prerequisites:**
+- `Job_Search_Config__c` object deployed in SF org (complete — done in Phase 4 SF track)
+- `Search_Config__c` Lookup on `JobApplication__c` deployed (complete)
+- `Anthropic_Claude` permission set grants Read+Edit on both (complete)
+
+**Deliverables:**
+- ✅ `job_finder/sf_config_reader.py` — `load_sf_profiles()`, `_map_record()`, `writeback()`
+- ✅ `job_finder/scheduler.py` updated — prefers SF configs over YAML at startup; falls back gracefully; calls `writeback()` after each run
+- ✅ `job_finder/orchestrator.py` updated — `sf_search_config_id` + `min_annual_salary` params; stamps `sf_search_config_id` on each job
+- ✅ `job_finder/db.py` updated — `sf_search_config_id` in `mark_pushed()`
+- ✅ `sql/04_job_lead_sf_config.sql` — add `sf_search_config_id VARCHAR(18)` to `job_lead`
+- ✅ `tests/test_sf_config_reader.py` — 8 unit tests
+- ✅ `tests/test_scheduler.py` updated — 5 new SF-driven flow tests
+
+**Validation:** 154/154 tests passing (141 prior + 8 sf_config_reader + 5 scheduler). CLI `--dry-run` YAML path confirmed working. SQL migration ready to apply.
+
+---
+
 ## 13. Future Considerations
 
 - **Cover letter draft generation** — use Claude to generate a tailored cover letter from `Company_Research__c` + job description

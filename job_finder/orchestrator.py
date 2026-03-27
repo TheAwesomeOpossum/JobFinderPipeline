@@ -23,14 +23,13 @@ def _get_parser(url: str):
     return generic
 
 
-def _above_salary_threshold(job: dict) -> bool:
+def _above_salary_threshold(job: dict, threshold: float) -> bool:
     """
-    Return True if the job passes the MIN_ANNUAL_SALARY threshold.
+    Return True if the job passes the given salary threshold.
 
     Filter logic: keep if max known salary >= threshold.
     If no salary data is known, always keep (don't penalise missing data).
     """
-    threshold = config.MIN_ANNUAL_SALARY
     if threshold <= 0:
         return True
 
@@ -60,6 +59,8 @@ def run(
     required_skills: list[str] | None = None,
     bonus_skills: list[str] | None = None,
     profile_name: str | None = None,
+    sf_search_config_id: str | None = None,
+    min_annual_salary: float | None = None,
 ) -> dict:
     """
     Execute the full job discovery pipeline.
@@ -135,15 +136,16 @@ def run(
             )
 
         # Stage 4.5: Hard salary threshold filter (never reaches job_lead)
-        if config.MIN_ANNUAL_SALARY > 0:
+        _salary_threshold = min_annual_salary if min_annual_salary is not None else config.MIN_ANNUAL_SALARY
+        if _salary_threshold > 0:
             before = len(parsed_jobs)
-            parsed_jobs = [j for j in parsed_jobs if _above_salary_threshold(j)]
+            parsed_jobs = [j for j in parsed_jobs if _above_salary_threshold(j, _salary_threshold)]
             summary["salary_filtered"] = before - len(parsed_jobs)
             if summary["salary_filtered"]:
                 logger.info(
                     "%d jobs dropped by salary threshold ($%.0f)",
                     summary["salary_filtered"],
-                    config.MIN_ANNUAL_SALARY,
+                    _salary_threshold,
                 )
 
         # Stage 5: Split qualified vs. skipped
@@ -152,9 +154,10 @@ def run(
         summary["qualified"] = len(qualified)
         summary["skipped"] = len(skipped)
 
-        # Stamp each job with the profile name before DB insert
+        # Stamp each job with the profile name and SF config ID before DB insert
         for job in qualified + skipped:
             job["search_profile"] = profile_name or "default"
+            job["sf_search_config_id"] = sf_search_config_id
 
         # Stage 6: Insert all into PG
         for job in qualified + skipped:
@@ -212,6 +215,7 @@ def run(
                     annual_salary=annual_midpoint(job),
                     salary_range_text=(job.get("salary_range_text") or "")[:20] or None,
                     search_profile=job.get("search_profile"),
+                    sf_search_config_id=job.get("sf_search_config_id"),
                 )
                 summary["pushed"] += 1
                 logger.info("Pushed: %s — %s", job.get("company"), job.get("title"))

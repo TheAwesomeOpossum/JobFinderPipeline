@@ -109,3 +109,109 @@ def test_run_job_does_not_crash_on_orchestrator_exception(monkeypatch):
 
     # Must not raise
     scheduler._run_job({}, "profiles/default.yaml")
+
+
+# ─── SF-driven flow tests ───────────────────────────────────────────────────
+
+def test_run_job_passes_sf_search_config_id_to_orchestrator(monkeypatch):
+    _reload_scheduler(monkeypatch)
+    from job_finder import scheduler
+
+    calls = []
+    monkeypatch.setattr(
+        scheduler.orchestrator,
+        "run",
+        lambda **kw: calls.append(kw) or dict(_FULL_SUMMARY),
+    )
+    monkeypatch.setattr(scheduler, "post_summary", lambda s: None)
+
+    profile = {"keywords": "Apex Dev", "limit": 5, "sf_record_id": "a001x000000XXXXX"}
+    scheduler._run_job(profile, "SF Config", sf=None)
+
+    assert calls[0]["sf_search_config_id"] == "a001x000000XXXXX"
+
+
+def test_run_job_passes_min_annual_salary_to_orchestrator(monkeypatch):
+    _reload_scheduler(monkeypatch)
+    from job_finder import scheduler
+
+    calls = []
+    monkeypatch.setattr(
+        scheduler.orchestrator,
+        "run",
+        lambda **kw: calls.append(kw) or dict(_FULL_SUMMARY),
+    )
+    monkeypatch.setattr(scheduler, "post_summary", lambda s: None)
+
+    profile = {"keywords": "Apex Dev", "limit": 5, "min_annual_salary": 150000.0}
+    scheduler._run_job(profile, "SF Config", sf=None)
+
+    assert calls[0]["min_annual_salary"] == 150000.0
+
+
+def test_run_job_calls_writeback_when_sf_config_id_present(monkeypatch):
+    _reload_scheduler(monkeypatch)
+    from job_finder import scheduler
+
+    monkeypatch.setattr(
+        scheduler.orchestrator,
+        "run",
+        lambda **kw: dict(_FULL_SUMMARY),
+    )
+    monkeypatch.setattr(scheduler, "post_summary", lambda s: None)
+
+    writeback_calls = []
+    monkeypatch.setattr(
+        scheduler.sf_config_reader,
+        "writeback",
+        lambda sf, config_id, summary: writeback_calls.append((sf, config_id, summary)),
+    )
+
+    mock_sf = object()
+    profile = {"keywords": "Apex Dev", "limit": 5, "sf_record_id": "a001x000000XXXXX"}
+    scheduler._run_job(profile, "SF Config", sf=mock_sf)
+
+    assert len(writeback_calls) == 1
+    assert writeback_calls[0][1] == "a001x000000XXXXX"
+
+
+def test_run_job_skips_writeback_when_no_sf_config_id(monkeypatch):
+    _reload_scheduler(monkeypatch)
+    from job_finder import scheduler
+
+    monkeypatch.setattr(
+        scheduler.orchestrator,
+        "run",
+        lambda **kw: dict(_FULL_SUMMARY),
+    )
+    monkeypatch.setattr(scheduler, "post_summary", lambda s: None)
+
+    writeback_calls = []
+    monkeypatch.setattr(
+        scheduler.sf_config_reader,
+        "writeback",
+        lambda *a, **kw: writeback_calls.append(True),
+    )
+
+    mock_sf = object()
+    profile = {"keywords": "Apex Dev", "limit": 5}  # no sf_record_id
+    scheduler._run_job(profile, "YAML Profile", sf=mock_sf)
+
+    assert len(writeback_calls) == 0
+
+
+def test_run_job_passes_days_from_profile(monkeypatch):
+    _reload_scheduler(monkeypatch)
+    from job_finder import scheduler
+
+    calls = []
+    monkeypatch.setattr(
+        scheduler.orchestrator,
+        "run",
+        lambda **kw: calls.append(kw) or dict(_FULL_SUMMARY),
+    )
+    monkeypatch.setattr(scheduler, "post_summary", lambda s: None)
+
+    scheduler._run_job({"keywords": "Apex", "limit": 5, "days": 3}, "Test Profile")
+
+    assert calls[0]["days"] == 3

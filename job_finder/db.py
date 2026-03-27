@@ -55,6 +55,7 @@ def mark_pushed(
     annual_salary: float | None = None,
     salary_range_text: str | None = None,
     search_profile: str | None = None,
+    sf_search_config_id: str | None = None,
 ) -> None:
     """Update job_lead status to 'pushed' with Salesforce IDs and salary data."""
     sql = """
@@ -65,7 +66,8 @@ def mark_pushed(
             sf_recruiter_contact_id = %(sf_recruiter_contact_id)s,
             annual_salary = %(annual_salary)s,
             salary_range_text = %(salary_range_text)s,
-            search_profile = %(search_profile)s
+            search_profile = %(search_profile)s,
+            sf_search_config_id = %(sf_search_config_id)s
         WHERE url_hash = %(url_hash)s
     """
     with conn.cursor() as cur:
@@ -77,6 +79,7 @@ def mark_pushed(
             "annual_salary":          annual_salary,
             "salary_range_text":      salary_range_text,
             "search_profile":         search_profile,
+            "sf_search_config_id":    sf_search_config_id,
         })
         conn.commit()
 
