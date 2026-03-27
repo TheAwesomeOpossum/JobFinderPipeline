@@ -9,12 +9,13 @@ from job_finder import config
 logger = logging.getLogger(__name__)
 
 
-def score(job: dict, keywords: str | None = None) -> int:
+def score(job: dict, keywords: str | None = None, bonus_skills: list[str] | None = None) -> int:
     """
-    Score a job 0–100 based on keyword, location, seniority, and recency signals.
+    Score a job 0–100 based on keyword, location, seniority, recency, and bonus skill signals.
     Mutates job["score"] and returns the score.
 
     keywords: comma-separated search keywords; falls back to config.DEFAULT_KEYWORDS.
+    bonus_skills: skill tokens that add +5 each (max +20) when found in description.
     """
     total = 0
     title = (job.get("title") or "").lower()
@@ -85,6 +86,11 @@ def score(job: dict, keywords: str | None = None) -> int:
                 total += 10
         except (ValueError, TypeError):
             pass
+
+    # Signal 6: bonus skill match (+5 per skill in description, max 20)
+    if bonus_skills:
+        matches = sum(1 for s in bonus_skills if s.lower() in description)
+        total += min(matches * 5, 20)
 
     result = max(0, min(100, total))
     job["score"] = result

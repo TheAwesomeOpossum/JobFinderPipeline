@@ -4,6 +4,7 @@ import argparse
 import logging
 import signal
 import sys
+from pathlib import Path
 
 from pytz import utc
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -11,23 +12,36 @@ from apscheduler.triggers.cron import CronTrigger
 
 from job_finder import config, orchestrator
 from job_finder.notifications import post_summary
-from job_finder.profiles import get_schedule, load_profile
+from job_finder.profiles import get_schedule, get_skills, load_profile
 
 logger = logging.getLogger(__name__)
 
 
-def _run_job(profile: dict) -> None:
+def _run_job(profile: dict, profile_path: str) -> None:
     """Scheduled job: run the discovery pipeline using profile config."""
     keywords = profile.get("keywords", config.DEFAULT_KEYWORDS)
     limit = int(profile.get("limit", config.DAILY_LIMIT))
-    logger.info("Scheduled run starting — keywords=%r limit=%d", keywords, limit)
+    profile_name = Path(profile_path).stem
+    required_skills, bonus_skills = get_skills(profile)
+    logger.info(
+        "Scheduled run starting — profile=%r keywords=%r limit=%d required_skills=%r",
+        profile_name, keywords, limit, required_skills,
+    )
     try:
-        summary = orchestrator.run(keywords=keywords, limit=limit, dry_run=False)
+        summary = orchestrator.run(
+            keywords=keywords,
+            limit=limit,
+            dry_run=False,
+            required_skills=required_skills or None,
+            bonus_skills=bonus_skills or None,
+            profile_name=profile_name,
+        )
         logger.info(
-            "Run complete: found=%d new=%d pushed=%d skipped=%d failed=%d",
+            "Run complete: found=%d new=%d pushed=%d skills_filtered=%d skipped=%d failed=%d",
             summary["found"],
             summary["new"],
             summary["pushed"],
+            summary["skills_filtered"],
             summary["skipped"],
             summary["failed"],
         )
@@ -39,15 +53,13 @@ def _run_job(profile: dict) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="JobFinder — nightly scheduler daemon")
     parser.add_argument(
-        "--profile",
-        default="profiles/default.yaml",
-        help="Path to YAML profile file (default: profiles/default.yaml)",
+        "--profiles",
+        nargs="+",
+        default=["profiles/default.yaml"],
+        metavar="PROFILE",
+        help="Paths to YAML profile files (default: profiles/default.yaml)",
     )
     args = parser.parse_args()
-
-    profile = load_profile(args.profile)
-    hour, minute = get_schedule(profile)
-    logger.info("Scheduler loaded profile=%r, schedule=%02d:%02d UTC", args.profile, hour, minute)
 
     scheduler = BlockingScheduler(
         timezone=utc,
@@ -68,19 +80,27 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
 
-    scheduler.add_job(
-        _run_job,
-        CronTrigger(hour=hour, minute=minute, timezone=utc),
-        args=[profile],
-        id="nightly_job_finder",
-        name="JobFinder nightly run",
-        replace_existing=True,  # Idempotent on restart — no duplicate job entries
-    )
+    for profile_path in args.profiles:
+        profile = load_profile(profile_path)
+        hour, minute = get_schedule(profile)
+        profile_name = Path(profile_path).stem
+        scheduler.add_job(
+            _run_job,
+            CronTrigger(hour=hour, minute=minute, timezone=utc),
+            args=[profile, profile_path],
+            id=f"job_finder_{profile_name}",
+            name=f"JobFinder — {profile_name}",
+            replace_existing=True,  # Idempotent on restart — no duplicate job entries
+        )
+        logger.info(
+            "Scheduled profile=%r at %02d:%02d UTC (id=job_finder_%s)",
+            profile_path, hour, minute, profile_name,
+        )
 
     # Suppress verbose APScheduler internal logs
     logging.getLogger("apscheduler").setLevel(logging.WARNING)
 
-    logger.info("Scheduler started — next run at %02d:%02d UTC", hour, minute)
+    logger.info("Scheduler started with %d profile(s)", len(args.profiles))
     scheduler.start()  # Blocks here until _shutdown() calls scheduler.shutdown()
 
 

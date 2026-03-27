@@ -25,18 +25,19 @@ def connect():
 def insert_job_lead(conn, job: dict) -> int:
     """Insert a job_lead row; silently skip on duplicate url_hash. Returns PG row id."""
     sql = """
-        INSERT INTO job_lead (url_hash, url, title, company, ats_type, score)
-        VALUES (%(url_hash)s, %(url)s, %(title)s, %(company)s, %(ats_type)s, %(score)s)
+        INSERT INTO job_lead (url_hash, url, title, company, ats_type, score, search_profile)
+        VALUES (%(url_hash)s, %(url)s, %(title)s, %(company)s, %(ats_type)s, %(score)s, %(search_profile)s)
         ON CONFLICT (url_hash) DO NOTHING
         RETURNING id
     """
     row = {
-        "url_hash": job.get("url_hash"),
-        "url":      job.get("url"),
-        "title":    job.get("title"),
-        "company":  job.get("company"),
-        "ats_type": job.get("ats_type"),
-        "score":    job.get("score"),
+        "url_hash":       job.get("url_hash"),
+        "url":            job.get("url"),
+        "title":          job.get("title"),
+        "company":        job.get("company"),
+        "ats_type":       job.get("ats_type"),
+        "score":          job.get("score"),
+        "search_profile": job.get("search_profile"),
     }
     with conn.cursor() as cur:
         cur.execute(sql, row)
@@ -53,6 +54,7 @@ def mark_pushed(
     sf_recruiter_contact_id: str | None = None,
     annual_salary: float | None = None,
     salary_range_text: str | None = None,
+    search_profile: str | None = None,
 ) -> None:
     """Update job_lead status to 'pushed' with Salesforce IDs and salary data."""
     sql = """
@@ -62,7 +64,8 @@ def mark_pushed(
             sf_account_id = %(sf_account_id)s,
             sf_recruiter_contact_id = %(sf_recruiter_contact_id)s,
             annual_salary = %(annual_salary)s,
-            salary_range_text = %(salary_range_text)s
+            salary_range_text = %(salary_range_text)s,
+            search_profile = %(search_profile)s
         WHERE url_hash = %(url_hash)s
     """
     with conn.cursor() as cur:
@@ -73,6 +76,7 @@ def mark_pushed(
             "sf_recruiter_contact_id": sf_recruiter_contact_id,
             "annual_salary":          annual_salary,
             "salary_range_text":      salary_range_text,
+            "search_profile":         search_profile,
         })
         conn.commit()
 

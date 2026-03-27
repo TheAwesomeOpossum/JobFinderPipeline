@@ -51,16 +51,26 @@ def _above_salary_threshold(job: dict) -> bool:
     return max(ceilings) >= threshold
 
 
-def run(keywords: str, limit: int, dry_run: bool, days: int = 1, verbose: bool = False) -> dict:
+def run(
+    keywords: str,
+    limit: int,
+    dry_run: bool,
+    days: int = 1,
+    verbose: bool = False,
+    required_skills: list[str] | None = None,
+    bonus_skills: list[str] | None = None,
+    profile_name: str | None = None,
+) -> dict:
     """
     Execute the full job discovery pipeline.
 
-    Returns a summary dict: {found, new, parsed, qualified, pushed, skipped, failed, salary_filtered}
+    Returns a summary dict: {found, new, parsed, skills_filtered, qualified, pushed, skipped, failed, salary_filtered}
     """
     summary = {
         "found":            0,
         "new":              0,
         "parsed":           0,
+        "skills_filtered":  0,
         "salary_filtered":  0,
         "qualified":        0,
         "pushed":           0,
@@ -105,8 +115,24 @@ def run(keywords: str, limit: int, dry_run: bool, days: int = 1, verbose: bool =
 
         # Stage 4: Score and sort (pass runtime keywords so scoring aligns with search)
         for job in parsed_jobs:
-            score(job, keywords=keywords)
+            score(job, keywords=keywords, bonus_skills=bonus_skills)
         parsed_jobs.sort(key=lambda j: j.get("score", 0), reverse=True)
+
+        # Stage 4.25: Hard required-skills filter (drops non-technical roles before scoring count)
+        def _has_required_skill(job: dict) -> bool:
+            if not required_skills:
+                return True
+            desc = (job.get("description") or "").lower()
+            return any(s.lower() in desc for s in required_skills)
+
+        before_skills = len(parsed_jobs)
+        parsed_jobs = [j for j in parsed_jobs if _has_required_skill(j)]
+        summary["skills_filtered"] = before_skills - len(parsed_jobs)
+        if summary["skills_filtered"]:
+            logger.info(
+                "%d jobs dropped by required-skills filter",
+                summary["skills_filtered"],
+            )
 
         # Stage 4.5: Hard salary threshold filter (never reaches job_lead)
         if config.MIN_ANNUAL_SALARY > 0:
@@ -125,6 +151,10 @@ def run(keywords: str, limit: int, dry_run: bool, days: int = 1, verbose: bool =
         skipped = parsed_jobs[limit:]
         summary["qualified"] = len(qualified)
         summary["skipped"] = len(skipped)
+
+        # Stamp each job with the profile name before DB insert
+        for job in qualified + skipped:
+            job["search_profile"] = profile_name or "default"
 
         # Stage 6: Insert all into PG
         for job in qualified + skipped:
@@ -181,6 +211,7 @@ def run(keywords: str, limit: int, dry_run: bool, days: int = 1, verbose: bool =
                     sf_recruiter_contact_id=sf_recruiter_contact_id,
                     annual_salary=annual_midpoint(job),
                     salary_range_text=(job.get("salary_range_text") or "")[:20] or None,
+                    search_profile=job.get("search_profile"),
                 )
                 summary["pushed"] += 1
                 logger.info("Pushed: %s — %s", job.get("company"), job.get("title"))
@@ -195,9 +226,10 @@ def run(keywords: str, limit: int, dry_run: bool, days: int = 1, verbose: bool =
         pg_conn.close()
 
     logger.info(
-        "Pipeline complete: found=%d new=%d parsed=%d salary_filtered=%d qualified=%d "
-        "pushed=%d skipped=%d failed=%d",
-        summary["found"], summary["new"], summary["parsed"], summary["salary_filtered"],
-        summary["qualified"], summary["pushed"], summary["skipped"], summary["failed"],
+        "Pipeline complete: found=%d new=%d parsed=%d skills_filtered=%d salary_filtered=%d "
+        "qualified=%d pushed=%d skipped=%d failed=%d",
+        summary["found"], summary["new"], summary["parsed"], summary["skills_filtered"],
+        summary["salary_filtered"], summary["qualified"], summary["pushed"],
+        summary["skipped"], summary["failed"],
     )
     return summary

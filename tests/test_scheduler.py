@@ -7,6 +7,8 @@ _FULL_SUMMARY = {
     "found": 5,
     "new": 3,
     "parsed": 3,
+    "skills_filtered": 0,
+    "salary_filtered": 0,
     "qualified": 2,
     "pushed": 2,
     "skipped": 1,
@@ -48,7 +50,7 @@ def test_run_job_calls_orchestrator_with_profile_values(monkeypatch):
     )
     monkeypatch.setattr(scheduler, "post_summary", lambda s: None)
 
-    scheduler._run_job({"keywords": "Salesforce Developer", "limit": 10})
+    scheduler._run_job({"keywords": "Salesforce Developer", "limit": 10}, "profiles/salesforce_dev.yaml")
 
     assert len(calls) == 1
     assert calls[0]["keywords"] == "Salesforce Developer"
@@ -68,7 +70,7 @@ def test_run_job_uses_config_defaults_when_profile_empty(monkeypatch):
     )
     monkeypatch.setattr(scheduler, "post_summary", lambda s: None)
 
-    scheduler._run_job({})
+    scheduler._run_job({}, "profiles/default.yaml")
 
     assert calls[0]["keywords"] == config.DEFAULT_KEYWORDS
     assert calls[0]["limit"] == config.DAILY_LIMIT
@@ -87,7 +89,7 @@ def test_run_job_calls_post_summary_after_success(monkeypatch):
     summaries = []
     monkeypatch.setattr(scheduler, "post_summary", lambda s: summaries.append(s))
 
-    scheduler._run_job({"keywords": "Python", "limit": 5})
+    scheduler._run_job({"keywords": "Python", "limit": 5}, "profiles/default.yaml")
 
     assert len(summaries) == 1
     assert summaries[0]["pushed"] == 2
@@ -106,4 +108,4 @@ def test_run_job_does_not_crash_on_orchestrator_exception(monkeypatch):
     monkeypatch.setattr(scheduler, "post_summary", lambda s: None)
 
     # Must not raise
-    scheduler._run_job({})
+    scheduler._run_job({}, "profiles/default.yaml")

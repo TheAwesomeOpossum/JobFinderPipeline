@@ -452,9 +452,9 @@ The pipeline runs end-to-end without errors, discovers at least one real job pos
 
 ---
 
-### Phase 3 — Recruiter Extraction
+### Phase 3 — Recruiter Extraction + Salary Tracking
 
-**Goal:** Identify and record recruiters from ATS postings.
+**Goal:** Identify and record recruiters from ATS postings; capture posted compensation.
 
 **Prerequisites:**
 - Deploy `Account.Type = 'Recruiter Account'` picklist value to Salesforce (manual Setup UI step)
@@ -464,8 +464,34 @@ The pipeline runs end-to-end without errors, discovers at least one real job pos
 - ✅ `Account` upsert for recruiting firm (`Type = 'Recruiter Account'`)
 - ✅ `Contact` upsert (deduped by email)
 - ✅ `Job_Application__c.Recruiter__c` populated
+- ✅ Salary extraction: Greenhouse (`pay_input_ranges`, cents→dollars), Lever (`salary` object), Generic (regex)
+- ✅ `Annual_Salary__c`, `Hourly_Rate__c`, `Salary_Range__c` written to `Job_Application__c`
+- ✅ `MIN_ANNUAL_SALARY` hard threshold filter (Stage 4.5)
+- ✅ `sql/02_job_lead_recruiter_salary.sql` migration
 
-**Validation:** Jobs with recruiter info have linked `Contact` records in Salesforce.
+**Validation:** Jobs with recruiter info have linked `Contact` records; salary fields populated on `Job_Application__c`.
+
+---
+
+### Phase 4 — Search Quality + Multi-Profile Scheduler
+
+**Goal:** Eliminate non-technical jobs from results; run multiple search profiles nightly.
+
+**Prerequisites:**
+- Add `Search_Profile__c` Text(100) field to `JobApplication__c` in SF Object Manager
+
+**Deliverables:**
+- ☐ `required_skills` hard filter (Stage 4.25) — any-of skill token match against full description
+- ☐ `bonus_skills` scoring signal (Signal 6) — +5 per matched skill, max +20
+- ☐ `profiles.py` helpers: `get_skills()`, `get_location()`, `get_seniority()` (fixes silent profile key bug)
+- ☐ Multi-profile scheduler (`--profiles` flag, one APScheduler job per profile)
+- ☐ `profiles/salesforce_architect.yaml` — new Architect search profile
+- ☐ `profiles/salesforce_dev.yaml` updated with `required_skills` / `bonus_skills` (GVS-aligned tokens)
+- ☐ `search_profile` stamped on each job; written to `job_lead` and `Job_Application__c.Search_Profile__c`
+- ☐ `sql/03_job_lead_search_profile.sql` migration
+- ☐ SF requirements handoff: `docs/sf_job_search_config_requirements.md` (for future `Job_Search_Config__c` SF-driven config layer)
+
+**Validation:** Dry run with `salesforce_dev` profile shows `skills_filtered > 0`; multi-profile scheduler logs two jobs at different times; `Search_Profile__c` populated on SF records.
 
 ---
 

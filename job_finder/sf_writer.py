@@ -146,6 +146,8 @@ def create_job_application(sf: Salesforce, job: dict, account_id: str) -> str:
         "Annual_Salary__c":    annual_midpoint(job),
         "Hourly_Rate__c":      hourly_midpoint(job),
         "Salary_Range__c":     (job.get("salary_range_text") or "")[:20] or None,
+        # Search config lookup — populated once Job_Search_Config__c is live in SF
+        "Search_Config__c":    job.get("sf_search_config_id") or None,
     }
     # Remove None values
     payload = {k: v for k, v in payload.items() if v is not None}

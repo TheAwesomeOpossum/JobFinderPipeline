@@ -1,0 +1,17 @@
+# Salesforce Architect profile
+keywords: "Salesforce Architect,Salesforce Solutions Architect,SFDC Architect,Salesforce Technical Architect"
+required_skills:
+  - Apex
+  - "Lightning Web Components"
+  - "Integration Cloud"
+bonus_skills:
+  - CPQ
+  - "Marketing Cloud"
+  - "Analytics Cloud"
+  - "Experience Cloud"
+  - "Field Service Lightning"
+limit: 8
+location_preference: "Remote"
+seniority_targets: "senior,staff,principal,lead,architect"
+schedule_hour: 3
+schedule_minute: 0

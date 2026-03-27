@@ -21,9 +21,15 @@ def main():
     pre_args, _ = pre.parse_known_args()
 
     profile_data: dict = {}
+    profile_name: str | None = None
+    _req_skills: list[str] = []
+    _bonus_skills: list[str] = []
     if pre_args.profile:
-        from job_finder.profiles import load_profile
+        from pathlib import Path
+        from job_finder.profiles import load_profile, get_skills, get_location, get_seniority
         profile_data = load_profile(pre_args.profile)
+        profile_name = Path(pre_args.profile).stem
+        _req_skills, _bonus_skills = get_skills(profile_data)
     # ── End profile pre-parse ──
 
     parser = argparse.ArgumentParser(
@@ -60,6 +66,20 @@ def main():
         action="store_true",
         help="In dry-run mode, print all scored jobs (qualified + skipped)",
     )
+    parser.add_argument(
+        "--required-skills",
+        nargs="+",
+        default=_req_skills or None,
+        metavar="SKILL",
+        help="Skills that must appear in job description (any-of gate). Overrides profile.",
+    )
+    parser.add_argument(
+        "--bonus-skills",
+        nargs="+",
+        default=_bonus_skills or None,
+        metavar="SKILL",
+        help="Skills that boost relevance score (+5 each, max 20). Overrides profile.",
+    )
     args = parser.parse_args()
 
     summary = orchestrator.run(
@@ -68,12 +88,16 @@ def main():
         dry_run=args.dry_run,
         days=args.days,
         verbose=args.verbose,
+        required_skills=args.required_skills,
+        bonus_skills=args.bonus_skills,
+        profile_name=profile_name,
     )
 
     print(
         f"\nSummary: found={summary['found']} new={summary['new']} parsed={summary['parsed']} "
-        f"salary_filtered={summary['salary_filtered']} qualified={summary['qualified']} "
-        f"pushed={summary['pushed']} skipped={summary['skipped']} failed={summary['failed']}"
+        f"skills_filtered={summary['skills_filtered']} salary_filtered={summary['salary_filtered']} "
+        f"qualified={summary['qualified']} pushed={summary['pushed']} "
+        f"skipped={summary['skipped']} failed={summary['failed']}"
     )
 
     sys.exit(1 if summary.get("failed", 0) > 0 else 0)

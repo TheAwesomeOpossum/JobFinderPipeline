@@ -1,7 +1,21 @@
 # Salesforce Developer profile
 keywords: "Salesforce Developer,Salesforce Engineer,SFDC Developer"
+required_skills:
+  - Apex
+  - "Lightning Web Components"
+  - "Flow Builder"
+  - SOQL
+  - "Screen Flows"
+bonus_skills:
+  - "Batch Apex"
+  - "Queueable Apex"
+  - "Invocable Apex"
+  - "Integration Cloud"
+  - CPQ
+  - "Experience Cloud"
+  - Aura
 limit: 10
 location_preference: "Remote"
-seniority_targets: "mid,senior"
+seniority_targets: "mid,senior,staff,principal,lead"
 schedule_hour: 2
 schedule_minute: 30
