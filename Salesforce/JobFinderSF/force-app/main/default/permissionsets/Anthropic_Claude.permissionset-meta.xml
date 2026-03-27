@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Anthropic Claude</label>
+    <description>Integration user permission set for the JobFinder Python pipeline. Grants read/create/edit access to Job_Search_Config__c and JobApplication__c.Search_Config__c. Replaces the typo'd Althropic_Claude perm set.</description>
+    <hasActivationRequired>false</hasActivationRequired>
+
+    <!-- Carried over from Althropic_Claude — external credential access for the Claude API named credential -->
+    <externalCredentialPrincipalAccesses>
+        <enabled>true</enabled>
+        <externalCredentialPrincipal>AnthropicClaudeAPI-AnthropicPrincipal</externalCredentialPrincipal>
+    </externalCredentialPrincipalAccesses>
+
+    <!-- Job_Search_Config__c object-level access: read/create/edit, no delete -->
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>Job_Search_Config__c</object>
+        <viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
+
+    <!-- Job_Search_Config__c field-level access — all 11 custom fields, readable + editable -->
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Job_Search_Config__c.Bonus_Skills__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Job_Search_Config__c.Daily_Limit__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Job_Search_Config__c.Days_Back__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Job_Search_Config__c.Is_Active__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Job_Search_Config__c.Keywords__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Job_Search_Config__c.Last_Run_At__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Job_Search_Config__c.Last_Run_Summary__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Job_Search_Config__c.Min_Annual_Salary__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Job_Search_Config__c.Required_Skills__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Job_Search_Config__c.Schedule_Hour__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Job_Search_Config__c.Schedule_Minute__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+
+    <!-- JobApplication__c.Search_Config__c lookup field — readable + editable so pipeline can populate at insert -->
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>JobApplication__c.Search_Config__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+
+</PermissionSet>

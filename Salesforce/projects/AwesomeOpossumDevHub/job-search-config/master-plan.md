@@ -66,7 +66,7 @@ Based on org patterns detected in context inventories:
 | Phase | Name | Scope | Plan File | Status |
 |---|---|---|---|---|
 | 1 | Data Model | `Job_Search_Config__c` object + 11 fields + `Search_Config__c` lookup on `JobApplication__c` + Admin profile FLS | `phase-1-data-model.md` | Plan Generated |
-| 2 | Security | Create `Anthropic_Claude` perm set (replaces `Althropic_Claude`); assign to integration user; remove old | — | Not Started |
+| 2 | Security | Create `Anthropic_Claude` perm set (replaces `Althropic_Claude`); assign to integration user; remove old | `phase-2-security.md` | Completed 2026-03-27 |
 | 3 | UI & Validation | 3 VRs + `Job Search Config Layout` + `Job_Search_Config` FlexiPage + custom tab + `Resume_Builder` app update + `Job_Application` FlexiPage update + `Active Configs` list view | — | Not Started |
 
 ---
@@ -82,7 +82,13 @@ _(Empty — no Apex in this feature. Regression runs via `RunLocalTests` after e
 
 ## Prior Phase Summaries
 
-_(Populated as phases complete.)_
+### Phase 2: Security — Complete (2026-03-27)
+- Deployed: `Anthropic_Claude` permission set (OLS Read/Create/Edit on `Job_Search_Config__c`; FLS readable+editable on all 11 fields + `JobApplication__c.Search_Config__c`; `externalCredentialPrincipalAccesses` for `AnthropicClaudeAPI-AnthropicPrincipal` carried over)
+- Data operations: Assigned `Anthropic_Claude` to `your-sf-user@example.com`; removed `Althropic_Claude` assignment; deleted `Althropic_Claude` from org via destructiveChanges
+- Test classes: none (declarative + data operation phase)
+- Regression: 86/88 passed (2 pre-existing `AIInterviewGuideControllerTest` failures unrelated to this phase)
+- Key decisions: `sf data create record` does not support `PermSetAssignment` — used anonymous Apex instead; SFDX project root is `JobFinderSF/` subdirectory
+- Known issues: `AIInterviewGuideControllerTest` has 2 pre-existing failures (unrelated to this feature)
 
 ---
 
@@ -96,5 +102,5 @@ _(Populated as phases complete.)_
 | AC-4 | VRs fire correctly — schedule hour/minute range + keywords required on activate | Phase 3 | Not Started |
 | AC-5 | `Job Search Configs` tab visible in Resume Lightning app | Phase 3 | Not Started |
 | AC-6 | `Search_Config__c` field visible on `Job_Application` FlexiPage | Phase 3 | Not Started |
-| AC-7 | `Anthropic_Claude` perm set grants correct access; `Althropic_Claude` removed from org | Phase 2 | Not Started |
+| AC-7 | `Anthropic_Claude` perm set grants correct access; `Althropic_Claude` removed from org | Phase 2 | Complete |
 | AC-8 | "Active Configs" list view shows only `Is_Active__c = true` records | Phase 3 | Not Started |
