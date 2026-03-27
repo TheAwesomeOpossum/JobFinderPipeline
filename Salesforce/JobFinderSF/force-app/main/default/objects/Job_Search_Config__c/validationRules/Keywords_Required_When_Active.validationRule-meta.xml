@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Keywords_Required_When_Active</fullName>
+    <active>true</active>
+    <description>Prevents activating a search config without at least one keyword. A config with no keywords would drive a broad, unfocused search run.</description>
+    <errorConditionFormula>AND(Is_Active__c, ISBLANK(Keywords__c))</errorConditionFormula>
+    <errorMessage>Keywords are required before activating a search config.</errorMessage>
+</ValidationRule>

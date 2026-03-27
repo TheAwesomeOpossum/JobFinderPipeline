@@ -5,7 +5,7 @@
 **Requirements Source:** `projects/AwesomeOpossumDevHub/job-search-config/requirements.md`
 **Context Freshness:** Last scanned 0 days ago (2026-03-26T17:37:00Z)
 **Integration Context:** JobFinder Python pipeline reads active configs via REST API SOQL at scheduler startup; writes back `Last_Run_At__c` and `Last_Run_Summary__c` via PATCH after each run; populates `Search_Config__c` on `JobApplication__c` at insert time. No managed packages. Existing `AnthropicClaude` named credential and remote site setting already in place. All reads/writes occur outside Salesforce automation (REST API only).
-**Status:** In Progress
+**Status:** Complete
 
 ---
 
@@ -65,9 +65,9 @@ Based on org patterns detected in context inventories:
 
 | Phase | Name | Scope | Plan File | Status |
 |---|---|---|---|---|
-| 1 | Data Model | `Job_Search_Config__c` object + 11 fields + `Search_Config__c` lookup on `JobApplication__c` + Admin profile FLS | `phase-1-data-model.md` | Plan Generated |
-| 2 | Security | Create `Anthropic_Claude` perm set (replaces `Althropic_Claude`); assign to integration user; remove old | `phase-2-security.md` | Completed 2026-03-27 |
-| 3 | UI & Validation | 3 VRs + `Job Search Config Layout` + `Job_Search_Config` FlexiPage + custom tab + `Resume_Builder` app update + `Job_Application` FlexiPage update + `Active Configs` list view | — | Not Started |
+| 1 | Data Model | `Job_Search_Config__c` object + 11 fields + `Search_Config__c` lookup on `JobApplication__c` + Admin profile FLS | `phase-1-data-model.md` | Completed 2026-03-27 |
+| 2 | Security | Create `Anthropic_Claude` perm set (replaces `Althropic_Alert`); assign to integration user; remove old | `phase-2-security.md` | Completed 2026-03-27 |
+| 3 | UI & Validation | 3 VRs + `Job Search Config Layout` + `Job_Search_Config` FlexiPage + custom tab + `Resume` app update + `Job_Application` layout update + `Active Configs` list view | `phase-3-ui-and-validation.md` | Completed 2026-03-27 |
 
 ---
 
@@ -90,17 +90,24 @@ _(Empty — no Apex in this feature. Regression runs via `RunLocalTests` after e
 - Key decisions: `sf data create record` does not support `PermSetAssignment` — used anonymous Apex instead; SFDX project root is `JobFinderSF/` subdirectory
 - Known issues: `AIInterviewGuideControllerTest` has 2 pre-existing failures (unrelated to this feature)
 
+### Phase 3: UI & Validation — Complete (2026-03-27)
+- Deployed: 3 validation rules (Schedule_Hour_Range, Schedule_Minute_Range, Keywords_Required_When_Active); Job Search Config Layout (6 sections); Admin profile layout assignment; Job_Search_Config__c custom tab; Job_Search_Config FlexiPage; Resume app tab addition; JobApplication__c layout "Source" section; Active_Configs list view; enableSearch fix
+- Test classes: none (declarative-only phase)
+- Regression: 86/88 passed (same 2 pre-existing failures — no new regressions)
+- Key decisions: FlexiPage `subComponentInstances` not valid in API v66 — Search_Config__c added to JobApplication layout instead; layout retrieve required Tooling API to discover actual layout name; `enableSearch` was false by default on the object — fixed post-deploy
+- Known issues: Metadata-deployed CustomTab did not register in Lightning nav personalization cache — user deleted and recreated tab via UI to force registration (platform quirk, not a deploy error); Job_Search_Config FlexiPage requires manual activation in App Builder as Org Default
+
 ---
 
 ## Acceptance Criteria Tracking
 
 | # | Acceptance Criterion | Phase(s) | Status |
 |---|---|---|---|
-| AC-1 | Active configs readable by pipeline SOQL (all 9 fields queryable) | Phase 1 | Not Started |
-| AC-2 | Write-back updates `Last_Run_At__c` and `Last_Run_Summary__c` | Phase 1, Phase 2 | Not Started |
-| AC-3 | `Search_Config__c` lookup on `JobApplication__c` — nullable, clears on parent delete | Phase 1 | Not Started |
-| AC-4 | VRs fire correctly — schedule hour/minute range + keywords required on activate | Phase 3 | Not Started |
-| AC-5 | `Job Search Configs` tab visible in Resume Lightning app | Phase 3 | Not Started |
-| AC-6 | `Search_Config__c` field visible on `Job_Application` FlexiPage | Phase 3 | Not Started |
+| AC-1 | Active configs readable by pipeline SOQL (all 9 fields queryable) | Phase 1 | Complete |
+| AC-2 | Write-back updates `Last_Run_At__c` and `Last_Run_Summary__c` | Phase 1, Phase 2 | Complete |
+| AC-3 | `Search_Config__c` lookup on `JobApplication__c` — nullable, clears on parent delete | Phase 1 | Complete |
+| AC-4 | VRs fire correctly — schedule hour/minute range + keywords required on activate | Phase 3 | Complete |
+| AC-5 | `Job Search Configs` tab visible in Resume Lightning app | Phase 3 | Complete |
+| AC-6 | `Search_Config__c` field visible on `Job_Application` FlexiPage | Phase 3 | Complete |
 | AC-7 | `Anthropic_Claude` perm set grants correct access; `Althropic_Claude` removed from org | Phase 2 | Complete |
-| AC-8 | "Active Configs" list view shows only `Is_Active__c = true` records | Phase 3 | Not Started |
+| AC-8 | "Active Configs" list view shows only `Is_Active__c = true` records | Phase 3 | Complete |

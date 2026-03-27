@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Schedule_Hour_Range</fullName>
+    <active>true</active>
+    <description>Ensures Schedule_Hour__c is between 0 and 23 (UTC). Null passes — Salesforce treats null numbers as 0 in comparisons, and 0 is a valid hour.</description>
+    <errorConditionFormula>Schedule_Hour__c &lt; 0 || Schedule_Hour__c &gt; 23</errorConditionFormula>
+    <errorMessage>Schedule Hour must be between 0 and 23 (UTC).</errorMessage>
+</ValidationRule>

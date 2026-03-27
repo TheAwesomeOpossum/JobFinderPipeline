@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomTab xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customObject>true</customObject>
+    <label>Job Search Configs</label>
+    <motif>Custom58: Custom Tab 58</motif>
+</CustomTab>
