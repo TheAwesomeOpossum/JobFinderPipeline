@@ -561,9 +561,9 @@ The pipeline runs end-to-end without errors, discovers at least one real job pos
 
 ### Setup Checklist
 
-1. ☐ Google Cloud: Enable Custom Search API → obtain `GOOGLE_API_KEY`
-2. ☐ Google CSE: Create Programmable Search Engine with all 5 ATS domains → obtain `GOOGLE_CSE_ID`
-3. ☐ Anthropic: Obtain `ANTHROPIC_API_KEY`
-4. ☐ PostgreSQL: Run `sql/01_job_lead_schema.sql` against the existing Salesforce_Backup database
-5. ☐ Copy `.env.example` → `.env` and populate all values
-6. ☐ (Phase 3 only) Add `'Recruiter Account'` to `Account.Type` picklist in Salesforce Setup UI
+1. ✅ ~~Google Cloud: Enable Custom Search API → obtain `GOOGLE_API_KEY`~~ — **Superseded:** project uses Serper.dev (`SERPER_API_KEY`) instead of Google CSE
+2. ✅ ~~Google CSE: Create Programmable Search Engine with all 5 ATS domains → obtain `GOOGLE_CSE_ID`~~ — **Superseded:** no longer needed with Serper.dev
+3. ✅ Anthropic: Obtain `ANTHROPIC_API_KEY` — set in `.env`
+4. ✅ PostgreSQL: All 4 SQL migrations applied to `job_lead` (migrations 01–04)
+5. ✅ Copy `.env.example` → `.env` and populate all values — all required vars confirmed set
+6. ✅ (Phase 3 only) Add `'Recruiter Account'` to `Account.Type` picklist in Salesforce Setup UI — confirmed present in SF org
