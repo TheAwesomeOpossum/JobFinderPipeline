@@ -71,8 +71,17 @@ def score(job: dict, keywords: str | None = None, bonus_skills: list[str] | None
     if re.search(r'\bjunior\b|\bentry.level\b|\bentry level\b|\binternship\b|\bintern\b', combined_text):
         total -= 10
 
-    # Signal 5.5: technical role type — bonus for developer/engineer titles, penalty otherwise
-    if re.search(r'\bdeveloper\b|\bengineer\b|\barchitect\b|\btechnical\b', title):
+    # Signal 5.5: technical role type — bonus for developer/architect unconditionally;
+    # engineer/technical only if the title is not a non-dev role (support, recruiter, pre-sales, etc.)
+    _NON_DEV_ROLE_RE = re.compile(
+        r'\brecruiter\b|\bsupport\b'
+        r'|\baccount\s+manager\b|\baccount\s+executive\b'
+        r'|\bsolutions?\s+engineer\b|\bsales\s+engineer\b'
+        r'|\bcustomer\s+success\b'
+    )
+    if re.search(r'\bdeveloper\b|\barchitect\b', title):
+        total += 15
+    elif re.search(r'\bengineer\b|\btechnical\b', title) and not _NON_DEV_ROLE_RE.search(title):
         total += 15
     else:
         total -= 20

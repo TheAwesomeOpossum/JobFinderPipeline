@@ -136,7 +136,7 @@ def create_job_application(sf: Salesforce, job: dict, account_id: str) -> str:
     """Create a JobApplication__c record and return its Salesforce Id."""
     payload = {
         # Do NOT set Name — Salesforce trigger auto-populates it
-        "Job_Title__c":        job.get("title", ""),
+        "Job_Title__c":        (job.get("title") or "")[:80],
         "Job_Description__c":  (job.get("description") or "")[:32768],
         "Job_Posting_URL__c":  job.get("url", ""),
         "Status__c":           "Draft",
@@ -148,6 +148,8 @@ def create_job_application(sf: Salesforce, job: dict, account_id: str) -> str:
         "Salary_Range__c":     (job.get("salary_range_text") or "")[:20] or None,
         # Search config lookup — populated once Job_Search_Config__c is live in SF
         "Search_Config__c":    job.get("sf_search_config_id") or None,
+        # Relevance score from the pipeline scorer (0–100)
+        "Job_Score__c":        job.get("score") if job.get("score") is not None else None,
     }
     # Remove None values
     payload = {k: v for k, v in payload.items() if v is not None}

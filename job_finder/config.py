@@ -41,5 +41,9 @@ SENIORITY_TARGETS   = [s.strip().lower() for s in os.getenv("SENIORITY_TARGETS",
 # Set to 0 (default) to disable filtering
 MIN_ANNUAL_SALARY = float(os.getenv("MIN_ANNUAL_SALARY", "0"))
 
+# Minimum relevance score — jobs scoring below this are discarded before push
+# Score=0 always means the job scored negative (floored); 25 cuts obvious noise
+MIN_SCORE_THRESHOLD = int(os.getenv("MIN_SCORE_THRESHOLD", "25"))
+
 # Logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

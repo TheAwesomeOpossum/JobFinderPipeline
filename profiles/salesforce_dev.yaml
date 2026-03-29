@@ -1,11 +1,5 @@
 # Salesforce Developer profile
 keywords: "Salesforce Developer,Salesforce Engineer,SFDC Developer"
-required_skills:
-  - Apex
-  - "Lightning Web Components"
-  - "Flow Builder"
-  - SOQL
-  - "Screen Flows"
 bonus_skills:
   - "Batch Apex"
   - "Queueable Apex"

@@ -1,6 +1,8 @@
 """Google Search client via Serper.dev API."""
 
 import logging
+from datetime import date, timedelta
+
 import requests
 
 from job_finder import config
@@ -23,7 +25,16 @@ def _tbs_for_days(days: int) -> str:
     return f"qdr:w{weeks}" if weeks > 1 else "qdr:w"
 
 
-def search_one_site(domain: str, ats_type: str, keywords: str, max_results: int = 10, days: int = 1) -> list[dict]:
+def _tbs_for_date(target: date) -> str:
+    """
+    Return a Serper custom date-range tbs string targeting a single calendar day.
+    Format: cdr:1,cd_min:M/D/YYYY,cd_max:M/D/YYYY
+    """
+    date_str = f"{target.month}/{target.day}/{target.year}"
+    return f"cdr:1,cd_min:{date_str},cd_max:{date_str}"
+
+
+def search_one_site(domain: str, ats_type: str, keywords: str, max_results: int = 10, tbs: str = "qdr:d") -> list[dict]:
     """
     Query Serper for a single ATS domain.
     Returns a list of raw result dicts with url, title, snippet, ats_type.
@@ -38,7 +49,7 @@ def search_one_site(domain: str, ats_type: str, keywords: str, max_results: int 
             "q":    query,
             "num":  PAGE_SIZE,
             "page": page,
-            "tbs":  _tbs_for_days(days),
+            "tbs":  tbs,
         }
         headers = {"X-API-KEY": config.SERPER_API_KEY, "Content-Type": "application/json"}
         try:
@@ -75,7 +86,10 @@ def search_one_site(domain: str, ats_type: str, keywords: str, max_results: int 
 def search_all_ats(keywords: str, max_per_site: int = 10, days: int = 1) -> list[dict]:
     """
     Query all registered ATS sites and return a combined flat list of raw results.
+    Uses a single date-window query (suitable for nightly 1-day runs).
+    For multi-day backfills use search_all_ats_backfill() instead.
     """
+    tbs = _tbs_for_days(days)
     all_results = []
     for site in ATS_SITES:
         site_results = search_one_site(
@@ -83,8 +97,48 @@ def search_all_ats(keywords: str, max_per_site: int = 10, days: int = 1) -> list
             ats_type=site["ats_type"],
             keywords=keywords,
             max_results=max_per_site,
-            days=days,
+            tbs=tbs,
         )
         all_results.extend(site_results)
     logger.info("search_all_ats total=%d results across %d sites", len(all_results), len(ATS_SITES))
+    return all_results
+
+
+def search_all_ats_backfill(keywords: str, days: int, max_per_site: int = 10) -> list[dict]:
+    """
+    One query per keyword per ATS site per day going back `days` calendar days.
+    Each keyword is issued as a separate Serper call so Google treats them as
+    distinct queries, maximising index coverage.
+    Deduplicates by URL across all keywords / days before returning.
+    Max theoretical yield: days × len(ATS_SITES) × len(keyword_list) × max_per_site.
+    Serper cost: days × len(ATS_SITES) × len(keyword_list) queries.
+    """
+    keyword_list = [kw.strip() for kw in keywords.split(",") if kw.strip()]
+    today = date.today()
+    seen_urls: set[str] = set()
+    all_results: list[dict] = []
+
+    for offset in range(days, 0, -1):
+        target = today - timedelta(days=offset)
+        tbs = _tbs_for_date(target)
+        day_results = []
+
+        for kw in keyword_list:
+            for site in ATS_SITES:
+                site_results = search_one_site(
+                    domain=site["domain"],
+                    ats_type=site["ats_type"],
+                    keywords=kw,
+                    max_results=max_per_site,
+                    tbs=tbs,
+                )
+                for r in site_results:
+                    if r["url"] not in seen_urls:
+                        seen_urls.add(r["url"])
+                        day_results.append(r)
+
+        logger.info("backfill day=%s → %d new results (running total=%d)", target, len(day_results), len(all_results) + len(day_results))
+        all_results.extend(day_results)
+
+    logger.info("search_all_ats_backfill total=%d unique results over %d days", len(all_results), days)
     return all_results

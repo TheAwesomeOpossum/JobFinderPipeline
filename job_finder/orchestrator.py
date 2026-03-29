@@ -65,7 +65,7 @@ def run(
     """
     Execute the full job discovery pipeline.
 
-    Returns a summary dict: {found, new, parsed, skills_filtered, qualified, pushed, skipped, failed, salary_filtered}
+    Returns a summary dict: {found, new, parsed, skills_filtered, salary_filtered, score_filtered, qualified, pushed, skipped, failed}
     """
     summary = {
         "found":            0,
@@ -73,6 +73,7 @@ def run(
         "parsed":           0,
         "skills_filtered":  0,
         "salary_filtered":  0,
+        "score_filtered":   0,
         "qualified":        0,
         "pushed":           0,
         "skipped":          0,
@@ -87,7 +88,10 @@ def run(
             sf = sf_writer.connect()
 
         # Stage 1: Search
-        raw_results = google_cse.search_all_ats(keywords, max_per_site=10, days=days)
+        if days > 1:
+            raw_results = google_cse.search_all_ats_backfill(keywords, days=days, max_per_site=10)
+        else:
+            raw_results = google_cse.search_all_ats(keywords, max_per_site=10, days=days)
         summary["found"] = len(raw_results)
         logger.info("Found %d raw results from Google CSE", len(raw_results))
 
@@ -146,6 +150,28 @@ def run(
                     "%d jobs dropped by salary threshold ($%.0f)",
                     summary["salary_filtered"],
                     _salary_threshold,
+                )
+
+        # Stage 4.75: Hard minimum-score filter — drops floored-negative noise
+        before_score = len(parsed_jobs)
+        score_dropped = [j for j in parsed_jobs if j.get("score", 0) < config.MIN_SCORE_THRESHOLD]
+        parsed_jobs   = [j for j in parsed_jobs if j.get("score", 0) >= config.MIN_SCORE_THRESHOLD]
+        summary["score_filtered"] = len(score_dropped)
+        if summary["score_filtered"]:
+            logger.info(
+                "%d jobs dropped by minimum score filter (threshold=%d)",
+                summary["score_filtered"], config.MIN_SCORE_THRESHOLD,
+            )
+        if verbose and score_dropped:
+            logger.info("--- Score-filtered jobs (score < %d) ---", config.MIN_SCORE_THRESHOLD)
+            for i, job in enumerate(score_dropped, 1):
+                logger.info(
+                    "  %d. [score=%d] %s @ %s\n     %s",
+                    i,
+                    job.get("score", 0),
+                    job.get("title", "?"),
+                    job.get("company", "?"),
+                    job.get("url", ""),
                 )
 
         # Stage 5: Split qualified vs. skipped
@@ -231,9 +257,9 @@ def run(
 
     logger.info(
         "Pipeline complete: found=%d new=%d parsed=%d skills_filtered=%d salary_filtered=%d "
-        "qualified=%d pushed=%d skipped=%d failed=%d",
+        "score_filtered=%d qualified=%d pushed=%d skipped=%d failed=%d",
         summary["found"], summary["new"], summary["parsed"], summary["skills_filtered"],
-        summary["salary_filtered"], summary["qualified"], summary["pushed"],
-        summary["skipped"], summary["failed"],
+        summary["salary_filtered"], summary["score_filtered"], summary["qualified"],
+        summary["pushed"], summary["skipped"], summary["failed"],
     )
     return summary

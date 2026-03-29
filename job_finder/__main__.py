@@ -64,7 +64,7 @@ def main():
     parser.add_argument(
         "--verbose",
         action="store_true",
-        help="In dry-run mode, print all scored jobs (qualified + skipped)",
+        help="Print score-filtered jobs (dropped below threshold) and, in dry-run, skipped jobs",
     )
     parser.add_argument(
         "--required-skills",

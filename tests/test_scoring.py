@@ -91,6 +91,45 @@ def test_score_sets_job_score_field(monkeypatch):
     assert job["score"] == result
 
 
+def test_non_dev_engineer_titles_score_lower_than_sf_developer(monkeypatch):
+    """Technical Recruiter, Support Engineer, Solutions Engineer should lose the +15 bonus."""
+    _set_env(monkeypatch)
+    sys.modules.pop("job_finder.config", None)
+    sys.modules.pop("job_finder.scoring", None)
+    from job_finder.scoring import score
+
+    # A real SF developer job — should score well
+    sf_dev = {
+        "title": "Senior Salesforce Developer",
+        "description": "salesforce developer remote united states senior",
+        "location": "Remote",
+        "posted_at": None,
+        "score": 0,
+    }
+    sf_dev_score = score(sf_dev, keywords="Salesforce Developer")
+
+    # Non-dev roles that should NOT receive the +15 engineer bonus
+    false_positives = [
+        "Technical Recruiter",
+        "Technical Support Engineer III",
+        "Technical Account Manager",
+        "Solutions Engineer",
+        "Sales Engineer",
+    ]
+    for fp_title in false_positives:
+        job = {
+            "title": fp_title,
+            "description": "salesforce developer remote united states senior",
+            "location": "Remote",
+            "posted_at": None,
+            "score": 0,
+        }
+        fp_score = score(job, keywords="Salesforce Developer")
+        assert fp_score < sf_dev_score, (
+            f"Expected '{fp_title}' (score={fp_score}) < SF Developer (score={sf_dev_score})"
+        )
+
+
 def test_score_recent_posting_adds_points(monkeypatch):
     _set_env(monkeypatch)
     sys.modules.pop("job_finder.config", None)
