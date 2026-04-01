@@ -47,7 +47,14 @@ def score(job: dict, keywords: str | None = None, bonus_skills: list[str] | None
     # Check both the structured location field and description text
     location_pref = config.LOCATION_PREFERENCE.lower()
     combined_location = location + " " + description
-    if "remote" in combined_location or location_pref in combined_location:
+    _REMOTE_RE = re.compile(
+        r'\bremote\b'
+        r'|\bwork.from.home\b|\bwfh\b'
+        r'|\bfully.remote\b|\b100%.remote\b'
+        r'|\bdistributed.team\b'
+        r'|\banywhere.in.the.u\.?s\b'
+    )
+    if _REMOTE_RE.search(combined_location) or location_pref in combined_location:
         total += 20
     # Bonus for explicit US location signals
     if re.search(r'\b(united states|usa|\bus\b|u\.s\.)\b', combined_location):
@@ -71,17 +78,21 @@ def score(job: dict, keywords: str | None = None, bonus_skills: list[str] | None
     if re.search(r'\bjunior\b|\bentry.level\b|\bentry level\b|\binternship\b|\bintern\b', combined_text):
         total -= 10
 
-    # Signal 5.5: technical role type — bonus for developer/architect unconditionally;
+    # Signal 5.5: technical role type — bonus for developer/architect/consultant unconditionally;
     # engineer/technical only if the title is not a non-dev role (support, recruiter, pre-sales, etc.)
+    # "consultant" is included because SF Developer roles at implementation firms use this title.
     _NON_DEV_ROLE_RE = re.compile(
         r'\brecruiter\b|\bsupport\b'
         r'|\baccount\s+manager\b|\baccount\s+executive\b'
-        r'|\bsolutions?\s+engineer\b|\bsales\s+engineer\b'
+        r'|\bsales\s+engineer\b'
         r'|\bcustomer\s+success\b'
     )
-    if re.search(r'\bdeveloper\b|\barchitect\b', title):
+    # "solutions engineer" exclusion only fires when "engineer" is paired with "solutions"
+    # but NOT "architect" (so "solutions architect" keeps the +15).
+    _SOLUTIONS_ENG_RE = re.compile(r'\bsolutions?\s+engineer\b')
+    if re.search(r'\bdeveloper\b|\barchitect\b|\bconsultant\b', title):
         total += 15
-    elif re.search(r'\bengineer\b|\btechnical\b', title) and not _NON_DEV_ROLE_RE.search(title):
+    elif re.search(r'\bengineer\b|\btechnical\b', title) and not _NON_DEV_ROLE_RE.search(title) and not _SOLUTIONS_ENG_RE.search(title):
         total += 15
     else:
         total -= 20

@@ -8,12 +8,12 @@ from job_finder import config, db, enrichment, sf_writer
 from job_finder.deduplicator import is_duplicate, hash_url
 from job_finder.scoring import score
 from job_finder.search import google_cse
-from job_finder.parser import greenhouse, lever, generic
+from job_finder.parser import greenhouse, lever, linkedin, generic
 from job_finder.salary_extractor import annual_midpoint
 
 logger = logging.getLogger(__name__)
 
-PARSERS = [greenhouse, lever, generic]  # order matters — generic is catch-all
+PARSERS = [greenhouse, lever, linkedin, generic]  # order matters — generic is catch-all
 
 
 def _get_parser(url: str):

@@ -1,9 +1,9 @@
 """Tests for job_finder/search/ats_sites.py"""
 
 
-def test_ats_sites_has_five_entries():
+def test_ats_sites_has_six_entries():
     from job_finder.search.ats_sites import ATS_SITES
-    assert len(ATS_SITES) == 5
+    assert len(ATS_SITES) == 6
 
 
 def test_ats_sites_has_greenhouse():

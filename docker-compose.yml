@@ -13,9 +13,16 @@ services:
     volumes:
       - ./profiles:/app/profiles:ro
       - ./logs:/app/logs
+    networks:
+      - default
+      - salesforce-backup_default
     logging:
       driver: json-file
       options:
         max-size: "20m"
         max-file: "5"
         compress: "true"
+
+networks:
+  salesforce-backup_default:
+    external: true

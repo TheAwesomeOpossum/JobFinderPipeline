@@ -7,6 +7,7 @@ ATS_SITES = [
     {"domain": "wd1.myworkdayjobs.com",     "ats_type": "workday"},
     {"domain": "jobs.ashbyhq.com",          "ats_type": "ashby"},
     {"domain": "jobs.smartrecruiters.com",  "ats_type": "smartrecruiters"},
+    {"domain": "linkedin.com/jobs/view",    "ats_type": "linkedin"},
 ]
 
 

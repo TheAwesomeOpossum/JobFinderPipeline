@@ -95,5 +95,5 @@ def test_search_all_ats_combines_results(monkeypatch):
 
     results = google_cse.search_all_ats("Software Engineer")
 
-    assert len(results) == 5  # one result per ATS site
-    assert len(call_domains) == 5
+    assert len(results) == 6  # one result per ATS site
+    assert len(call_domains) == 6
