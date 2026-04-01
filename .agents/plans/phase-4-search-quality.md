@@ -207,7 +207,7 @@ python3 -m job_finder.scheduler \
 # Confirm two scheduled jobs logged, then kill
 
 # 5. DB migration
-PGPASSWORD=your_pg_password psql -h localhost -p 5432 -U sfuser -d salesforce_backup \
+PGPASSWORD=<your_pg_password> psql -h localhost -p 5432 -U sfuser -d salesforce_backup \
     -f sql/03_job_lead_search_profile.sql
 
 # 6. Live run
