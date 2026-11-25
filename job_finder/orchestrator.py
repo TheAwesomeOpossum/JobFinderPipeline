@@ -263,3 +263,105 @@ def run(
         summary["pushed"], summary["skipped"], summary["failed"],
     )
     return summary
+
+
+def push_url(url: str, dry_run: bool = False) -> dict:
+    """
+    Push a single job URL directly into Salesforce.
+
+    Simplified pipeline: parse → enrich → write to SF + DB.
+    Skips search, dedup, scoring filters — the user explicitly chose this job.
+    """
+    from job_finder.deduplicator import hash_url
+
+    pg_conn = db.connect()
+    sf = None
+
+    try:
+        if not dry_run:
+            sf = sf_writer.connect()
+
+        # Parse
+        parser = _get_parser(url)
+        raw = {"url": url, "url_hash": hash_url(url)}
+        job = parser.parse(raw)
+
+        # If the primary parser is the generic catch-all, try Greenhouse custom-domain
+        # detection as a fallback (many companies embed Greenhouse behind custom URLs)
+        if parser is generic:
+            gh_job = greenhouse.parse(raw)
+            if gh_job is not None:
+                logger.info("Detected Greenhouse embed — using Greenhouse API data")
+                job = gh_job
+
+        if job is None:
+            logger.error("Parser returned None for: %s", url)
+            return {"success": False, "error": "Failed to parse job posting"}
+
+        job["url_hash"] = hash_url(job["url"])
+        job["search_profile"] = "manual"
+        job["sf_search_config_id"] = None
+
+        # Score (informational only — not used for filtering)
+        score(job)
+
+        logger.info(
+            "Parsed: %s @ %s (score=%d)",
+            job.get("title", "?"),
+            job.get("company", "?"),
+            job.get("score", 0),
+        )
+
+        # Insert into PG
+        db.insert_job_lead(pg_conn, job)
+
+        if dry_run:
+            logger.info("Dry run — would push to Salesforce:")
+            logger.info("  Title:   %s", job.get("title"))
+            logger.info("  Company: %s", job.get("company"))
+            logger.info("  Score:   %s", job.get("score"))
+            logger.info("  Salary:  %s", job.get("salary_range_text") or "unknown")
+            return {"success": True, "dry_run": True, "job": job}
+
+        # Enrich
+        job = enrichment.enrich_jobs([job])[0]
+        job = enrichment.enrich_recruiter_jobs([job])[0]
+
+        # Write to Salesforce
+        sf_job_app_id, sf_account_id, sf_recruiter_contact_id = sf_writer.write_job(sf, job)
+        db.mark_pushed(
+            pg_conn,
+            job["url_hash"],
+            sf_job_app_id,
+            sf_account_id,
+            sf_recruiter_contact_id=sf_recruiter_contact_id,
+            annual_salary=annual_midpoint(job),
+            salary_range_text=(job.get("salary_range_text") or "")[:20] or None,
+            search_profile="manual",
+        )
+
+        logger.info(
+            "Pushed to Salesforce: %s @ %s (JobApp=%s, Account=%s)",
+            job.get("title"),
+            job.get("company"),
+            sf_job_app_id,
+            sf_account_id,
+        )
+        return {
+            "success": True,
+            "title": job.get("title"),
+            "company": job.get("company"),
+            "sf_job_app_id": sf_job_app_id,
+            "sf_account_id": sf_account_id,
+        }
+
+    except Exception as exc:
+        logger.error("push_url failed for %s: %s", url, exc)
+        try:
+            db.mark_failed(pg_conn, hash_url(url), str(exc)[:2000])
+        except Exception:
+            pass
+        return {"success": False, "error": str(exc)}
+
+    finally:
+        pg_conn.close()

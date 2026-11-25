@@ -36,6 +36,10 @@ def main():
         description="JobFinder — discover freshly posted engineering jobs"
     )
     parser.add_argument(
+        "--url",
+        help="Push a single job URL directly to Salesforce (skips search/filters)",
+    )
+    parser.add_argument(
         "--profile",
         help="Path to YAML profile file (overrides env defaults, overridden by explicit flags)",
     )
@@ -82,6 +86,23 @@ def main():
     )
     args = parser.parse_args()
 
+    # ── Single-URL push mode ──
+    if args.url:
+        result = orchestrator.push_url(url=args.url, dry_run=args.dry_run)
+        if result.get("success"):
+            if result.get("dry_run"):
+                print("\nDry run complete. Job parsed but not pushed to Salesforce.")
+            else:
+                print(
+                    f"\nPushed: {result.get('title')} @ {result.get('company')}"
+                    f"\n  JobApplication: {result.get('sf_job_app_id')}"
+                    f"\n  Account:        {result.get('sf_account_id')}"
+                )
+        else:
+            print(f"\nFailed: {result.get('error')}")
+        sys.exit(0 if result.get("success") else 1)
+
+    # ── Normal pipeline mode ──
     summary = orchestrator.run(
         keywords=args.keywords,
         limit=args.limit,
